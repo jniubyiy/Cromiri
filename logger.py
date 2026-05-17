@@ -2,14 +2,10 @@
 import logging
 import os
 import sys
+from logging.handlers import RotatingFileHandler
 from datetime import datetime
 
 class BrowserLogger:
-    """
-    Централизованный логгер браузера.
-    Записывает информационные сообщения, предупреждения и ошибки
-    в файл browser.log и дублирует в консоль.
-    """
     _instance = None
 
     def __new__(cls, *args, **kwargs):
@@ -23,30 +19,27 @@ class BrowserLogger:
             return
         self._initialized = True
 
-        # Определяем директорию для логов
         if log_dir is None:
             log_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logs")
         os.makedirs(log_dir, exist_ok=True)
-
         self.log_file = os.path.join(log_dir, "browser.log")
 
-        # Создаём логгер
         self.logger = logging.getLogger("browser")
         self.logger.setLevel(level)
 
-        # Форматтер
         formatter = logging.Formatter(
             '%(asctime)s [%(levelname)s] %(name)s: %(message)s',
             datefmt='%Y-%m-%d %H:%M:%S'
         )
 
-        # Файловый обработчик
-        file_handler = logging.FileHandler(self.log_file, encoding='utf-8')
+        # Ротируемый файловый обработчик: 5 МБ, до 3 бэкапов
+        file_handler = RotatingFileHandler(
+            self.log_file, maxBytes=5*1024*1024, backupCount=3, encoding='utf-8'
+        )
         file_handler.setLevel(level)
         file_handler.setFormatter(formatter)
         self.logger.addHandler(file_handler)
 
-        # Консольный обработчик (только warnings и ошибки)
         console_handler = logging.StreamHandler(sys.stdout)
         console_handler.setLevel(logging.WARNING)
         console_handler.setFormatter(formatter)
@@ -72,8 +65,6 @@ class BrowserLogger:
         self.logger.critical(msg, *args, **kwargs)
 
     def exception(self, msg, *args, **kwargs):
-        """Логирует исключение с трейсбеком."""
         self.logger.exception(msg, *args, **kwargs)
 
-# Глобальный экземпляр для импорта
 browser_logger = BrowserLogger()

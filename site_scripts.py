@@ -23,8 +23,13 @@ class SiteScript:
 
     @staticmethod
     def from_dict(d):
-        return SiteScript(d["name"], d.get("description", ""), d["pattern"], d["code"], d.get("enabled", True))
-
+        return SiteScript(
+            d["name"],
+            d.get("description", ""),
+            d["pattern"],
+            d["code"],
+            d.get("enabled", True)
+        )
 
 class SiteScriptManager:
     def __init__(self, settings: 'SettingsManager'):
@@ -74,6 +79,9 @@ class SiteScriptManager:
 
     def inject_scripts(self, view: QWebEngineView, url: QUrl):
         url_str = url.toString()
+        # Не внедряем скрипты на внутренние страницы браузера
+        if url.scheme() in ("about", "chrome", "file"):
+            return
         for script in self.scripts:
             if not script.enabled:
                 continue

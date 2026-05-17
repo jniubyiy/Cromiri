@@ -1,10 +1,8 @@
 # ui/toolbars.py
 from PyQt6.QtCore import QUrl, QSize
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout,
-    QPushButton, QLineEdit, QToolButton, QMenu
+    QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLineEdit, QToolButton
 )
-from PyQt6.QtGui import QAction
 
 class NavigationToolbar(QWidget):
     def __init__(self, parent=None):
@@ -16,13 +14,12 @@ class NavigationToolbar(QWidget):
         main_layout.setContentsMargins(0, 0, 0, 0)
         main_layout.setSpacing(2)
 
-        # Верхняя строка: значки расширений (если есть)
+        # Верхняя строка: значки расширений (WebEngine + встроенные) — будут справа
         self.ext_icons_container = QWidget()
         self.ext_icons_layout = QHBoxLayout(self.ext_icons_container)
         self.ext_icons_layout.setContentsMargins(0, 0, 0, 0)
         self.ext_icons_layout.setSpacing(2)
-        # Растяжка справа, чтобы значки были слева
-        self.ext_icons_layout.addStretch()
+        # Растяжка будет добавляться динамически в update_extension_icons
         main_layout.addWidget(self.ext_icons_container)
 
         # Нижняя строка: кнопки навигации + адресная строка
@@ -91,33 +88,46 @@ class NavigationToolbar(QWidget):
             if w:
                 w.deleteLater()
 
-        # Проверяем, поддерживаются ли расширения
-        if not self.browser.ext_manager._supports_extensions:
+        # Проверяем, есть ли вообще расширения для показа
+        webengine_extensions = []
+        if self.browser.ext_manager and self.browser.ext_manager._supports_extensions:
+            for name in self.browser.ext_manager.get_installed_names():
+                if self.browser.ext_manager.is_enabled(name):
+                    webengine_extensions.append(name)
+
+        builtin_extensions = []
+        if hasattr(self.browser, 'builtin_ext_mgr') and self.browser.builtin_ext_mgr:
+            builtin_extensions = self.browser.builtin_ext_mgr.get_activated_extensions()
+
+        if not webengine_extensions and not builtin_extensions:
             self.ext_icons_container.hide()
             return
 
-        # Добавляем значки включённых расширений
-        any_visible = False
-        for name in self.browser.ext_manager.get_installed_names():
-            if self.browser.ext_manager.is_enabled(name):
-                any_visible = True
-                btn = QToolButton()
-                btn.setIcon(self.browser.ext_manager.get_icon(name))
-                btn.setIconSize(QSize(20, 20))
-                btn.setToolTip(name)
-                menu = QMenu()
-                action_disable = QAction("Отключить", menu)
-                action_disable.triggered.connect(
-                    lambda checked, n=name: self.browser.toggle_extension(n, False)
-                )
-                menu.addAction(action_disable)
-                btn.setMenu(menu)
-                btn.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
-                self.ext_icons_layout.addWidget(btn)
+        # Растяжка слева – прижимает значки к правому краю
+        self.ext_icons_layout.addStretch()
 
-        if any_visible:
-            # Добавляем растяжку, чтобы значки были слева, а справа пустота
-            self.ext_icons_layout.addStretch()
-            self.ext_icons_container.show()
-        else:
-            self.ext_icons_container.hide()
+        # Добавляем значки WebEngine-расширений (без меню)
+        for name in webengine_extensions:
+            btn = QToolButton()
+            btn.setIcon(self.browser.ext_manager.get_icon(name))
+            btn.setIconSize(QSize(20, 20))
+            btn.setToolTip(f"WebEngine: {name}")
+            self.ext_icons_layout.addWidget(btn)
+
+        # Добавляем значки встроенных расширений (без меню)
+        for name in builtin_extensions:
+            ext_instance = self.browser.builtin_ext_mgr.extensions.get(name)
+            if not ext_instance:
+                continue
+            btn = QToolButton()
+            icon = ext_instance.get_icon()
+            if icon and not icon.isNull():
+                btn.setIcon(icon)
+            else:
+                from PyQt6.QtWidgets import QApplication, QStyle
+                btn.setIcon(QApplication.style().standardIcon(QStyle.StandardPixmap.SP_ComputerIcon))
+            btn.setIconSize(QSize(20, 20))
+            btn.setToolTip(f"Встроенное: {name}")
+            self.ext_icons_layout.addWidget(btn)
+
+        self.ext_icons_container.show()
