@@ -4,8 +4,6 @@ import json
 from typing import Dict, List
 from logger import browser_logger
 
-MAX_EXTENSION_SIZE_MB = 100
-
 class ExtensionsLoader:
     def __init__(self, settings):
         self.settings = settings
@@ -26,20 +24,19 @@ class ExtensionsLoader:
         if not os.path.isdir(self._ext_dir):
             os.makedirs(self._ext_dir, exist_ok=True)
             return
+        max_size_mb = self.settings.get("extension_limits.max_size_mb", 100)
         for name in os.listdir(self._ext_dir):
             try:
                 path = os.path.join(self._ext_dir, name)
                 if not os.path.isdir(path):
                     continue
-                # Проверка размера папки
                 size_mb = self._get_dir_size_mb(path)
-                if size_mb > MAX_EXTENSION_SIZE_MB:
-                    browser_logger.warning(f"Расширение '{name}' пропущено: размер {size_mb:.1f} МБ превышает лимит")
+                if size_mb > max_size_mb:
+                    browser_logger.warning(f"Расширение '{name}' пропущено: размер {size_mb:.1f} МБ превышает лимит {max_size_mb} МБ")
                     continue
                 manifest = os.path.join(path, 'manifest.json')
                 if not os.path.isfile(manifest):
                     continue
-                # Валидация манифеста
                 if self._validate_manifest(manifest):
                     self.webengine_extensions[name] = path
                     browser_logger.debug(f"Найдено WebEngine-расширение: {name}")

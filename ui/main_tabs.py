@@ -1,8 +1,10 @@
 # ui/main_tabs.py
-from PyQt6.QtCore import QPropertyAnimation, QEasingCurve, QTimer
+from PyQt6.QtCore import QPropertyAnimation, QEasingCurve, QParallelAnimationGroup
 from PyQt6.QtWidgets import QWidget, QHBoxLayout, QTabBar
 
 class MainTabsPanel(QWidget):
+    """Боковая панель главных вкладок – выезжает слева и одновременно раскрывается по высоте;
+       при скрытии уходит влево и вверх."""
     def __init__(self, parent=None):
         super().__init__(parent)
         layout = QHBoxLayout(self)
@@ -16,12 +18,15 @@ class MainTabsPanel(QWidget):
         layout.addWidget(self.tab_bar)
         layout.addStretch()
 
+        # Вычисляем целевые размеры
         self.full_width = self.tab_bar.sizeHint().width() + 8
         self.full_height = self.tab_bar.sizeHint().height() + 4
 
-        self.setMaximumWidth(0)
-        self.setMaximumHeight(0)
+        # Начальное состояние: полностью видима (будет управляться извне)
+        self.setMaximumWidth(self.full_width)
+        self.setMaximumHeight(self.full_height)
 
+        # Анимации ширины и высоты
         self.width_anim = QPropertyAnimation(self, b"maximumWidth")
         self.width_anim.setDuration(300)
         self.width_anim.setEasingCurve(QEasingCurve.Type.InOutCubic)
@@ -30,33 +35,24 @@ class MainTabsPanel(QWidget):
         self.height_anim.setDuration(300)
         self.height_anim.setEasingCurve(QEasingCurve.Type.InOutCubic)
 
-        # Тайм-аут анимации
-        self._anim_timer = QTimer(self)
-        self._anim_timer.setSingleShot(True)
-        self._anim_timer.timeout.connect(self._on_anim_timeout)
+        self.anim_group = QParallelAnimationGroup()
+        self.anim_group.addAnimation(self.width_anim)
+        self.anim_group.addAnimation(self.height_anim)
 
     def show_panel(self):
-        self._start_anim(self.full_width, self.full_height)
+        """Показать панель (выезд слева и раскрытие вниз)."""
+        self.anim_group.stop()
+        self.width_anim.setStartValue(self.width())
+        self.width_anim.setEndValue(self.full_width)
+        self.height_anim.setStartValue(self.height())
+        self.height_anim.setEndValue(self.full_height)
+        self.anim_group.start()
 
     def hide_panel(self):
-        self._start_anim(0, 0)
-
-    def _start_anim(self, target_width, target_height):
-        self.width_anim.stop()
-        self.height_anim.stop()
+        """Скрыть панель (заезд влево и схлопывание вверх)."""
+        self.anim_group.stop()
         self.width_anim.setStartValue(self.width())
-        self.width_anim.setEndValue(target_width)
+        self.width_anim.setEndValue(0)
         self.height_anim.setStartValue(self.height())
-        self.height_anim.setEndValue(target_height)
-        self.width_anim.start()
-        self.height_anim.start()
-        # Тайм-аут: если через 1 с анимация не завершилась, принудительно ставим конечное состояние
-        self._anim_timer.start(1000)
-        self._target_width = target_width
-        self._target_height = target_height
-
-    def _on_anim_timeout(self):
-        self.width_anim.stop()
-        self.height_anim.stop()
-        self.setMaximumWidth(self._target_width)
-        self.setMaximumHeight(self._target_height)
+        self.height_anim.setEndValue(0)
+        self.anim_group.start()

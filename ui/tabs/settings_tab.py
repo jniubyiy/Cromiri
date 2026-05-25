@@ -3,7 +3,7 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QLineEdit,
     QGroupBox, QListWidget, QListWidgetItem, QFileDialog, QMessageBox,
-    QCheckBox, QFormLayout
+    QCheckBox, QFormLayout, QSpinBox, QScrollArea
 )
 from logger import browser_logger
 
@@ -14,7 +14,12 @@ class SettingsTab(QWidget):
         self.settings = browser.settings
         self.profile = browser.profile
 
-        layout = QVBoxLayout()
+        main_scroll = QScrollArea()
+        main_scroll.setWidgetResizable(True)
+        container = QWidget()
+        main_scroll.setWidget(container)
+
+        layout = QVBoxLayout(container)
 
         # ---------- Группа "Профиль" ----------
         profile_group = QGroupBox("Профиль")
@@ -32,18 +37,89 @@ class SettingsTab(QWidget):
         # ---------- Группа "Параметры браузера" ----------
         browser_group = QGroupBox("Параметры браузера")
         browser_form = QFormLayout()
-
         self.user_agent_edit = QLineEdit()
         browser_form.addRow("User-Agent:", self.user_agent_edit)
-
         self.js_checkbox = QCheckBox("Включён")
         browser_form.addRow("JavaScript:", self.js_checkbox)
-
         self.images_checkbox = QCheckBox("Включены")
         browser_form.addRow("Изображения:", self.images_checkbox)
-
         browser_group.setLayout(browser_form)
         layout.addWidget(browser_group)
+
+        # ---------- Группа "Лимиты вкладок" ----------
+        tabs_limits_group = QGroupBox("Лимиты вкладок")
+        tabs_form = QFormLayout()
+        self.max_tabs_spin = QSpinBox()
+        self.max_tabs_spin.setRange(1, 200)
+        tabs_form.addRow("Максимум вкладок:", self.max_tabs_spin)
+        self.reload_limit_spin = QSpinBox()
+        self.reload_limit_spin.setRange(1, 50)
+        tabs_form.addRow("Лимит перезагрузок:", self.reload_limit_spin)
+        self.reload_interval_spin = QSpinBox()
+        self.reload_interval_spin.setRange(5, 300)
+        self.reload_interval_spin.setSuffix(" сек")
+        tabs_form.addRow("Интервал перезагрузок:", self.reload_interval_spin)
+        tabs_limits_group.setLayout(tabs_form)
+        layout.addWidget(tabs_limits_group)
+
+        # ---------- Группа "Лимиты ресурсов" ----------
+        resource_group = QGroupBox("Лимиты ресурсов")
+        resource_form = QFormLayout()
+        self.max_mem_spin = QSpinBox()
+        self.max_mem_spin.setRange(30, 100)
+        self.max_mem_spin.setSuffix(" %")
+        resource_form.addRow("Макс. память:", self.max_mem_spin)
+        self.max_cpu_spin = QSpinBox()
+        self.max_cpu_spin.setRange(30, 100)
+        self.max_cpu_spin.setSuffix(" %")
+        resource_form.addRow("Макс. CPU:", self.max_cpu_spin)
+        self.monitor_interval_spin = QSpinBox()
+        self.monitor_interval_spin.setRange(1000, 60000)
+        self.monitor_interval_spin.setSingleStep(1000)
+        self.monitor_interval_spin.setSuffix(" мс")
+        resource_form.addRow("Интервал проверки:", self.monitor_interval_spin)
+        resource_group.setLayout(resource_form)
+        layout.addWidget(resource_group)
+
+        # ---------- Группа "Лимиты расширений" ----------
+        ext_limits_group = QGroupBox("Лимиты расширений")
+        ext_limits_form = QFormLayout()
+        self.max_ext_size_spin = QSpinBox()
+        self.max_ext_size_spin.setRange(10, 1000)
+        self.max_ext_size_spin.setSuffix(" МБ")
+        ext_limits_form.addRow("Макс. размер расширения:", self.max_ext_size_spin)
+        self.max_errors_spin = QSpinBox()
+        self.max_errors_spin.setRange(1, 100)
+        ext_limits_form.addRow("Макс. ошибок в интервале:", self.max_errors_spin)
+        self.error_interval_spin = QSpinBox()
+        self.error_interval_spin.setRange(1, 300)
+        self.error_interval_spin.setSuffix(" сек")
+        ext_limits_form.addRow("Интервал ошибок:", self.error_interval_spin)
+        ext_limits_group.setLayout(ext_limits_form)
+        layout.addWidget(ext_limits_group)
+
+        # ---------- Группа "Интерфейс" ----------
+        interface_group = QGroupBox("Интерфейс")
+        interface_form = QFormLayout()
+        self.anim_timeout_spin = QSpinBox()
+        self.anim_timeout_spin.setRange(100, 5000)
+        self.anim_timeout_spin.setSuffix(" мс")
+        interface_form.addRow("Таймаут анимации:", self.anim_timeout_spin)
+        interface_group.setLayout(interface_form)
+        layout.addWidget(interface_group)
+
+        # ---------- Группа "Сессия" ----------
+        session_group = QGroupBox("Сессия")
+        session_form = QFormLayout()
+        self.session_max_size_spin = QSpinBox()
+        self.session_max_size_spin.setRange(1, 100)
+        self.session_max_size_spin.setSuffix(" МБ")
+        session_form.addRow("Макс. размер файла сессии:", self.session_max_size_spin)
+        self.session_max_fails_spin = QSpinBox()
+        self.session_max_fails_spin.setRange(0, 10)
+        session_form.addRow("Макс. попыток восстановления:", self.session_max_fails_spin)
+        session_group.setLayout(session_form)
+        layout.addWidget(session_group)
 
         # ---------- Группа "WebEngine-расширения" ----------
         ext_group = QGroupBox("WebEngine-расширения")
@@ -76,17 +152,42 @@ class SettingsTab(QWidget):
         layout.addWidget(save_btn)
 
         layout.addStretch()
-        self.setLayout(layout)
 
-        # Первоначальное заполнение
+        outer_layout = QVBoxLayout(self)
+        outer_layout.addWidget(main_scroll)
+        self.setLayout(outer_layout)
+
         self.refresh_all()
 
     def refresh_all(self):
-        """Перечитывает настройки и обновляет все виджеты."""
+        """Перечитывает все настройки из менеджера и обновляет виджеты."""
         self.profile_path_edit.setText(self.settings.get("profile_path", ""))
         self.user_agent_edit.setText(self.settings.get("browser_config.user_agent") or "")
         self.js_checkbox.setChecked(self.settings.get("browser_config.javascript_enabled", True))
         self.images_checkbox.setChecked(self.settings.get("browser_config.images_enabled", True))
+
+        # Лимиты вкладок
+        self.max_tabs_spin.setValue(self.settings.get("tab_limits.max_tabs"))
+        self.reload_limit_spin.setValue(self.settings.get("tab_limits.reload_limit"))
+        self.reload_interval_spin.setValue(self.settings.get("tab_limits.reload_interval_sec"))
+
+        # Лимиты ресурсов
+        self.max_mem_spin.setValue(self.settings.get("resource_limits.max_memory_percent"))
+        self.max_cpu_spin.setValue(self.settings.get("resource_limits.max_cpu_percent"))
+        self.monitor_interval_spin.setValue(self.settings.get("resource_limits.monitor_interval_ms"))
+
+        # Лимиты расширений
+        self.max_ext_size_spin.setValue(self.settings.get("extension_limits.max_size_mb"))
+        self.max_errors_spin.setValue(self.settings.get("extension_limits.max_errors_per_interval"))
+        self.error_interval_spin.setValue(self.settings.get("extension_limits.error_interval_sec"))
+
+        # Интерфейс
+        self.anim_timeout_spin.setValue(self.settings.get("interface.animation_timeout_ms"))
+
+        # Сессия
+        self.session_max_size_spin.setValue(self.settings.get("session.max_size_mb"))
+        self.session_max_fails_spin.setValue(self.settings.get("session.max_restore_fails"))
+
         self.refresh_extensions_list()
         self.refresh_builtin_extensions_list()
 
@@ -97,22 +198,49 @@ class SettingsTab(QWidget):
 
     def save_all_settings(self):
         try:
+            # Профиль и браузер
             self.settings.set("profile_path", self.profile_path_edit.text().strip())
             self.settings.set("browser_config.user_agent", self.user_agent_edit.text().strip() or None)
             self.settings.set("browser_config.javascript_enabled", self.js_checkbox.isChecked())
             self.settings.set("browser_config.images_enabled", self.images_checkbox.isChecked())
+
+            # Лимиты вкладок
+            self.settings.set("tab_limits.max_tabs", self.max_tabs_spin.value())
+            self.settings.set("tab_limits.reload_limit", self.reload_limit_spin.value())
+            self.settings.set("tab_limits.reload_interval_sec", self.reload_interval_spin.value())
+
+            # Лимиты ресурсов
+            self.settings.set("resource_limits.max_memory_percent", self.max_mem_spin.value())
+            self.settings.set("resource_limits.max_cpu_percent", self.max_cpu_spin.value())
+            self.settings.set("resource_limits.monitor_interval_ms", self.monitor_interval_spin.value())
+
+            # Лимиты расширений
+            self.settings.set("extension_limits.max_size_mb", self.max_ext_size_spin.value())
+            self.settings.set("extension_limits.max_errors_per_interval", self.max_errors_spin.value())
+            self.settings.set("extension_limits.error_interval_sec", self.error_interval_spin.value())
+
+            # Интерфейс
+            self.settings.set("interface.animation_timeout_ms", self.anim_timeout_spin.value())
+
+            # Сессия
+            self.settings.set("session.max_size_mb", self.session_max_size_spin.value())
+            self.settings.set("session.max_restore_fails", self.session_max_fails_spin.value())
+
+            self.settings.save()
+
+            # Применяем настройки к профилю
             if self.profile:
                 self.profile.setHttpUserAgent(self.settings.get("browser_config.user_agent") or "")
                 ws = self.profile.settings()
                 ws.setAttribute(ws.WebAttribute.JavascriptEnabled, self.js_checkbox.isChecked())
                 ws.setAttribute(ws.WebAttribute.AutoLoadImages, self.images_checkbox.isChecked())
-            self.settings.save()
+
             QMessageBox.information(self, "Сохранено", "Настройки успешно сохранены.")
         except Exception as e:
             browser_logger.error(f"Ошибка сохранения настроек: {e}")
             QMessageBox.warning(self, "Ошибка", f"Не удалось сохранить настройки:\n{e}")
 
-    # Методы для WebEngine-расширений
+    # ================== WebEngine-расширения ==================
     def refresh_extensions_list(self):
         self.ext_list_widget.clear()
         ext_manager = getattr(self.browser, 'ext_manager', None)
@@ -171,7 +299,7 @@ class SettingsTab(QWidget):
                 self.refresh_extensions_list()
                 self.browser.nav_toolbar.update_extension_icons()
 
-    # Методы для встроенных расширений
+    # ================== Встроенные расширения ==================
     def refresh_builtin_extensions_list(self):
         if not hasattr(self, 'builtin_ext_list_widget'):
             return

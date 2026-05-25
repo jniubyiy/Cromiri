@@ -24,7 +24,6 @@ from ui.toolbars import NavigationToolbar
 from ui.tabs.settings_tab import SettingsTab
 from ui.tabs.scripts_tab import ScriptsTab
 
-MAX_SESSION_RESTORE_FAILS = 3
 
 class BrowserUI(QMainWindow):
     def __init__(self, settings: SettingsManager, session: SessionManager, ext_loader: ExtensionsLoader):
@@ -36,7 +35,9 @@ class BrowserUI(QMainWindow):
         self.settings = settings
         self.session = session
         self.ext_loader = ext_loader
-        self._session_restore_fails = 0
+
+        self.session.max_size_mb = self.settings.get("session.max_size_mb", 5)
+        self.session.max_restore_fails = self.settings.get("session.max_restore_fails", 3)
 
         self.profile = QWebEngineProfile.defaultProfile()
         self.profile.setPersistentStoragePath(self.settings.get("profile_path"))
@@ -52,6 +53,9 @@ class BrowserUI(QMainWindow):
             main_layout.setContentsMargins(0, 0, 0, 0)
             main_layout.setSpacing(0)
 
+            self.main_tabs_panel = MainTabsPanel()
+            main_layout.addWidget(self.main_tabs_panel)
+
             self.content_stack = QStackedWidget()
             main_layout.addWidget(self.content_stack, 1)
 
@@ -59,14 +63,11 @@ class BrowserUI(QMainWindow):
             self.settings_tab = SettingsTab(self)
             self.scripts_tab = ScriptsTab(self)
 
-            self.content_stack.addWidget(self.view_tab)      # 0
-            self.content_stack.addWidget(self.settings_tab)  # 1
-            self.content_stack.addWidget(self.scripts_tab)   # 2
+            self.content_stack.addWidget(self.view_tab)      # index 0
+            self.content_stack.addWidget(self.settings_tab)  # index 1
+            self.content_stack.addWidget(self.scripts_tab)   # index 2
 
-            self.main_tabs_panel = MainTabsPanel()
-            self.view_tab.layout().insertWidget(0, self.main_tabs_panel)
             self.main_tabs_panel.tab_bar.currentChanged.connect(self.on_main_tab_changed)
-            self.main_tabs_visible = False
         except Exception as e:
             browser_logger.exception(f"Критическая ошибка построения GUI: {e}")
             raise SystemExit(1)
@@ -81,12 +82,13 @@ class BrowserUI(QMainWindow):
             self.page_tabs.add_new_page_tab(QUrl("about:blank"))
 
         self.installEventFilter(self)
-
-        # При переключении на вкладку настроек обновляем её
         self.main_tabs_panel.tab_bar.currentChanged.connect(self._on_main_tab_changed_refresh)
 
+        self.main_tabs_visible = True
+        self._saved_main_tabs_visible = True
+
     def _on_main_tab_changed_refresh(self, index):
-        if index == 1:  # вкладка настроек
+        if index == 1:
             try:
                 self.settings_tab.refresh_all()
             except Exception as e:
@@ -109,16 +111,37 @@ class BrowserUI(QMainWindow):
     def toggle_main_tabs(self):
         if self.main_tabs_visible:
             self.main_tabs_panel.hide_panel()
+            self.main_tabs_visible = False
         else:
             self.main_tabs_panel.show_panel()
-        self.main_tabs_visible = not self.main_tabs_visible
+            self.main_tabs_visible = True
 
     def on_main_tab_changed(self, index):
         self.content_stack.setCurrentIndex(index)
+        if index == 0:
+            if self._saved_main_tabs_visible and not self.main_tabs_visible:
+                self.main_tabs_panel.show_panel()
+                self.main_tabs_visible = True
+            elif not self._saved_main_tabs_visible and self.main_tabs_visible:
+                self.main_tabs_panel.hide_panel()
+                self.main_tabs_visible = False
+        else:
+            self._saved_main_tabs_visible = self.main_tabs_visible
+            if not self.main_tabs_visible:
+                self.main_tabs_panel.show_panel()
+                self.main_tabs_visible = True
 
     def _restore_session(self):
-        if self._session_restore_fails >= MAX_SESSION_RESTORE_FAILS:
-            browser_logger.warning("Превышено число попыток восстановления сессии, сессия проигнорирована")
+        # Попытка восстановить сохранённые вкладки
+        tab_states = self.session.get_tab_states()
+        if tab_states:
+            browser_logger.info(f"Восстанавливаю {len(tab_states)} вкладок из сессии")
+            self.page_tabs.restore_tabs(tab_states)
+            return
+
+        # Если нет сохранённых вкладок, используем старую логику (последний URL)
+        if self.session.max_restore_fails <= 0:
+            browser_logger.info("Восстановление сессии отключено настройками")
             return
         try:
             nav_history = self.session.history.get("navigation", [])
@@ -126,12 +149,8 @@ class BrowserUI(QMainWindow):
                 last_url = nav_history[-1]["url"]
                 self.page_tabs.add_new_page_tab(QUrl(last_url))
                 browser_logger.info(f"Сессия восстановлена: {last_url}")
-                self._session_restore_fails = 0
-            else:
-                browser_logger.info("Нет сохранённой сессии для восстановления")
         except Exception as e:
             browser_logger.exception(f"Ошибка восстановления сессии: {e}")
-            self._session_restore_fails += 1
 
     def _load_extensions(self):
         try:
@@ -225,6 +244,13 @@ class BrowserUI(QMainWindow):
         return super().eventFilter(obj, event)
 
     def closeEvent(self, event):
+        # Сохраняем состояния вкладок
+        try:
+            states = self.page_tabs.get_all_tab_states()
+            self.session.save_tab_states(states)
+        except Exception as e:
+            browser_logger.exception(f"Ошибка сохранения состояний вкладок: {e}")
+
         if self.builtin_ext_mgr:
             try:
                 for name in self.builtin_ext_mgr.get_activated_extensions():

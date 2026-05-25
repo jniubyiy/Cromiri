@@ -7,10 +7,6 @@ from PyQt6.QtWebEngineCore import QWebEngineScript
 from page_loader import PageLoader
 from logger import browser_logger
 
-MAX_TABS = 50
-RELOAD_LIMIT = 5
-RELOAD_INTERVAL = 30  # секунд
-
 class PageTabManager(QWidget):
     def __init__(self, parent=None, stack: QStackedWidget = None, toggle_main_tabs_callback=None):
         super().__init__(parent)
@@ -42,13 +38,12 @@ class PageTabManager(QWidget):
         layout.addWidget(self.new_tab_btn)
         layout.addStretch()
 
-        self.views = {}    # index -> QWebEngineView
-        self.loaders = {}  # index -> PageLoader
-        self._reload_counts = {}  # view -> [(time, count)]
+        self.views = {}
+        self.loaders = {}
+        self._reload_counts = {}
 
-        # Мониторинг ресурсов
         self.resource_timer = QTimer(self)
-        self.resource_timer.setInterval(5000)
+        self._update_timer_interval()
         self.resource_timer.timeout.connect(self._check_resource_usage)
         self.resource_timer.start()
 
@@ -56,9 +51,14 @@ class PageTabManager(QWidget):
         if self.toggle_main_tabs_callback:
             self.toggle_main_tabs_callback()
 
-    def add_new_page_tab(self, url=None):
-        if self.tab_bar.count() >= MAX_TABS:
-            browser_logger.warning(f"Достигнут лимит вкладок ({MAX_TABS}), новая не создана")
+    def _update_timer_interval(self):
+        interval = self.browser.settings.get("resource_limits.monitor_interval_ms", 5000)
+        self.resource_timer.setInterval(interval)
+
+    def add_new_page_tab(self, url=None, suspended=False, title=None):
+        max_tabs = self.browser.settings.get("tab_limits.max_tabs", 50)
+        if self.tab_bar.count() >= max_tabs:
+            browser_logger.warning(f"Достигнут лимит вкладок ({max_tabs}), новая не создана")
             return
         if self.stack is None:
             raise RuntimeError("Стек страниц не назначен.")
@@ -76,12 +76,19 @@ class PageTabManager(QWidget):
         index = self.stack.addWidget(view)
         self.views[index] = view
         self.loaders[index] = loader
-        self.tab_bar.addTab("Новая вкладка")
+
+        tab_title = title or "Новая вкладка"
+        self.tab_bar.addTab(tab_title)
         tab_index = self.tab_bar.count() - 1
         self.tab_bar.setCurrentIndex(tab_index)
-        if url is not None:
-            view.load(url)
-        browser_logger.info(f"Создана новая вкладка с URL: {url.toString()}")
+
+        if suspended and url:
+            # Восстанавливаем приостановленную вкладку
+            view.setProperty("suspended_url", QUrl(url))
+            view.load(QUrl("about:blank"))
+        elif url:
+            view.load(QUrl(url))
+        browser_logger.info(f"Создана вкладка: url={url}, suspended={suspended}")
 
     def close_tab(self, tab_index):
         if self.tab_bar.count() <= 1:
@@ -97,7 +104,6 @@ class PageTabManager(QWidget):
         del self.views[tab_index]
         del self.loaders[tab_index]
         self.tab_bar.removeTab(tab_index)
-        # Перенумерация индексов
         new_views = {}
         new_loaders = {}
         for i, v in self.views.items():
@@ -124,7 +130,6 @@ class PageTabManager(QWidget):
 
     def on_url_changed(self, url, view):
         self.update_tab_title(view)
-        # Контроль частых перезагрузок
         self._track_reload(view)
         if self.active_view() == view:
             self.browser.nav_toolbar.update_address_bar(url)
@@ -174,13 +179,14 @@ class PageTabManager(QWidget):
 
     def _track_reload(self, view):
         now = time.time()
+        reload_limit = self.browser.settings.get("tab_limits.reload_limit", 5)
+        reload_interval = self.browser.settings.get("tab_limits.reload_interval_sec", 30)
         if view not in self._reload_counts:
             self._reload_counts[view] = []
-        # Удаляем старые записи (старше интервала)
-        self._reload_counts[view] = [t for t in self._reload_counts[view] if now - t < RELOAD_INTERVAL]
+        self._reload_counts[view] = [t for t in self._reload_counts[view] if now - t < reload_interval]
         self._reload_counts[view].append(now)
-        if len(self._reload_counts[view]) > RELOAD_LIMIT:
-            browser_logger.warning(f"Вкладка перезагружается слишком часто, загрузка заблокирована")
+        if len(self._reload_counts[view]) > reload_limit:
+            browser_logger.warning("Вкладка перезагружается слишком часто, загрузка заблокирована")
             view.setHtml("<html><body><h3>Слишком много перезагрузок. Вкладка приостановлена.</h3></body></html>")
             view.stop()
 
@@ -189,9 +195,8 @@ class PageTabManager(QWidget):
             import psutil
             mem = psutil.virtual_memory()
             cpu = psutil.cpu_percent(interval=0.1)
-            limits = self.browser.settings.get("resource_limits", {})
-            max_mem = limits.get("max_memory_percent", 85)
-            max_cpu = limits.get("max_cpu_percent", 90)
+            max_mem = self.browser.settings.get("resource_limits.max_memory_percent", 85)
+            max_cpu = self.browser.settings.get("resource_limits.max_cpu_percent", 90)
 
             if mem.percent > max_mem or cpu > max_cpu:
                 browser_logger.warning(f"Высокая загрузка: память {mem.percent}%, CPU {cpu}%. Приостанавливаем фоновые вкладки.")
@@ -205,3 +210,35 @@ class PageTabManager(QWidget):
                             browser_logger.info(f"Вкладка {idx} приостановлена")
         except Exception as e:
             browser_logger.exception(f"Ошибка мониторинга ресурсов: {e}")
+
+    def get_all_tab_states(self):
+        """Возвращает список состояний всех вкладок для сохранения в сессию."""
+        states = []
+        for idx in sorted(self.views.keys()):
+            view = self.views[idx]
+            suspended_url = view.property("suspended_url")
+            if suspended_url and isinstance(suspended_url, QUrl):
+                url = suspended_url.toString()
+                suspended = True
+            else:
+                url = view.url().toString()
+                suspended = False
+            title = view.title() or self.tab_bar.tabText(idx)
+            states.append({
+                "url": url,
+                "title": title,
+                "suspended": suspended
+            })
+        return states
+
+    def restore_tabs(self, states):
+        """Удаляет все существующие вкладки и создаёт новые из списка состояний."""
+        # Закрываем все текущие вкладки, кроме последней? Проще очистить полностью.
+        while self.tab_bar.count() > 0:
+            self.close_tab(0)
+        for state in states:
+            self.add_new_page_tab(
+                url=state.get("url", "about:blank"),
+                suspended=state.get("suspended", False),
+                title=state.get("title", "")
+            )
