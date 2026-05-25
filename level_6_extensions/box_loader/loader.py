@@ -1,11 +1,14 @@
 import os, json
+from level_0.level_base import Box
 from logger import browser_logger
 
-class LoaderBox:
+class LoaderBox(Box):
     def __init__(self, settings_wrapper):
+        super().__init__("loader")
         self.settings = settings_wrapper
-        self._ext_dir = os.path.join(os.path.dirname(__file__), "..", "..", "extensions")
-        self._builtin_dir = os.path.join(os.path.dirname(__file__), "..", "..", "builtin_extensions")
+        self._ext_dir = os.path.join(os.path.dirname(__file__), "..", "..", "..", "extensions")
+        self._builtin_dir = os.path.join(os.path.dirname(__file__), "..", "..", "..", "builtin_extensions")
+
     def scan(self):
         webengine = {}
         if os.path.isdir(self._ext_dir):
@@ -26,6 +29,7 @@ class LoaderBox:
                 if os.path.isdir(full) and os.path.isfile(os.path.join(full, '__init__.py')):
                     builtin.append(name)
         return webengine, builtin
+
     def _validate_manifest(self, path):
         try:
             with open(path, 'r', encoding='utf-8') as f:
@@ -34,6 +38,7 @@ class LoaderBox:
         except Exception as e:
             browser_logger.error(f"Ошибка чтения манифеста {path}: {e}")
             return False
+
     def _get_dir_size_mb(self, path):
         total = 0
         for dirpath, _, filenames in os.walk(path):

@@ -1,7 +1,10 @@
 import psutil
+from level_0.level_base import Box
 from logger import browser_logger
 
-class MemoryBox:
+class MemoryBox(Box):
+    def __init__(self):
+        super().__init__("memory")
     def get_total(self):
         try:
             return psutil.virtual_memory().total

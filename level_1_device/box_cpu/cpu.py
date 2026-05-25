@@ -1,8 +1,11 @@
 import psutil
 import platform
+from level_0.level_base import Box
 from logger import browser_logger
 
-class CPUBox:
+class CPUBox(Box):
+    def __init__(self):
+        super().__init__("cpu")
     def get_info(self):
         try:
             freq = psutil.cpu_freq()

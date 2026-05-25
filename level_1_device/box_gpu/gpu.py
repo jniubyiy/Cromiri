@@ -1,13 +1,16 @@
+from level_0.level_base import Box
 from logger import browser_logger
 
-class GPUBox:
+class GPUBox(Box):
+    def __init__(self):
+        super().__init__("gpu")
     def get_list(self):
         try:
             import GPUtil
             gpus = GPUtil.getGPUs()
             return [{'name': g.name, 'driver': g.driver, 'memory_total_mb': g.memoryTotal, 'load': g.load * 100} for g in gpus]
         except ImportError:
-            browser_logger.info("GPUtil не установлен")
+            browser_logger.info("GPUtil не установлен, информация о GPU недоступна")
             return []
         except Exception as e:
             browser_logger.exception(f"GPUBox error: {e}")

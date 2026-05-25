@@ -2,10 +2,12 @@ from PyQt6.QtCore import QUrl, QTimer
 from PyQt6.QtWidgets import QWidget, QHBoxLayout, QTabBar, QStackedWidget, QPushButton
 from PyQt6.QtWebEngineWidgets import QWebEngineView
 from page_loader import PageLoader
+from level_0.level_base import Box
 from logger import browser_logger
 
-class TabsBox:
+class TabsBox(Box):
     def __init__(self, settings, session, style_script_box):
+        super().__init__("tabs")
         self.settings = settings
         self.session = session
         self.style_script_box = style_script_box
@@ -85,8 +87,13 @@ class TabsBox:
             lambda status, code, v=view: self._on_render_process_crashed(v)
         )
 
-        self.style_script_box.apply_styles(view)
-        self.style_script_box.inject_scripts(view, QUrl("about:blank"))
+        # style_script_box – это BoxWrapper, вызываем через call
+        if hasattr(self.style_script_box, 'call'):
+            self.style_script_box.call("apply_styles", view)
+            self.style_script_box.call("inject_scripts", view, QUrl("about:blank"))
+        else:
+            self.style_script_box.apply_styles(view)
+            self.style_script_box.inject_scripts(view, QUrl("about:blank"))
 
         self.stack.addWidget(view)
         self._loaders[view] = loader
@@ -115,7 +122,10 @@ class TabsBox:
                 if self.stack.widget(i) is view:
                     self.tab_bar.setTabText(i, title[:30])
                     break
-            self.style_script_box.inject_scripts(view, url)
+            if hasattr(self.style_script_box, 'call'):
+                self.style_script_box.call("inject_scripts", view, url)
+            else:
+                self.style_script_box.inject_scripts(view, url)
 
     def close_tab(self, index):
         if self.tab_bar.count() <= 1:
@@ -165,7 +175,7 @@ class TabsBox:
             browser_logger.error(f"Ошибка мониторинга ресурсов: {e}")
 
     def restore_session(self):
-        tab_states = self.session.get_tab_states()
+        tab_states = self.session.get_tab_states() if hasattr(self.session, 'get_tab_states') else self.session.get_tab_states()
         if tab_states:
             for state in tab_states:
                 url = state.get("url", "about:blank")
@@ -181,5 +191,9 @@ class TabsBox:
                 url = view.url().toString()
                 title = view.page().title() or url
                 tab_states.append({"url": url, "title": title})
-        self.session.set_tab_states(tab_states)
-        self.session.save_session()
+        if hasattr(self.session, 'set_tab_states'):
+            self.session.set_tab_states(tab_states)
+            self.session.save_session()
+        else:
+            self.session.set_tab_states(tab_states)
+            self.session.save_session()

@@ -1,6 +1,9 @@
+from level_0.level_base import Box
 from logger import browser_logger
 
-class SettingsValidationBox:
+class SettingsValidationBox(Box):
+    def __init__(self):
+        super().__init__("validation")
     def validate(self, data):
         if not isinstance(data, dict):
             browser_logger.warning("Настройки повреждены, сброс")

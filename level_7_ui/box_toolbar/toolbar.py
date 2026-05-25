@@ -2,10 +2,12 @@ from PyQt6.QtCore import QUrl
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLineEdit, QToolButton
 )
+from level_0.level_base import Box
 from logger import browser_logger
 
-class ToolbarBox:
+class ToolbarBox(Box):
     def __init__(self, tabs_box):
+        super().__init__("toolbar")
         self.tabs_box = tabs_box
         self._widget = None
         self.ext_icons_container = None
@@ -48,24 +50,24 @@ class ToolbarBox:
         return self._widget
 
     def go_back(self):
-        loader = self.tabs_box.active_loader()
+        loader = self.tabs_box.call("active_loader") if hasattr(self.tabs_box, "call") else self.tabs_box.active_loader()
         if loader:
             loader.back()
 
     def go_forward(self):
-        loader = self.tabs_box.active_loader()
+        loader = self.tabs_box.call("active_loader") if hasattr(self.tabs_box, "call") else self.tabs_box.active_loader()
         if loader:
             loader.forward()
 
     def go_refresh(self):
-        loader = self.tabs_box.active_loader()
+        loader = self.tabs_box.call("active_loader") if hasattr(self.tabs_box, "call") else self.tabs_box.active_loader()
         if loader:
             loader.reload()
 
     def navigate(self):
         text = self.address_bar.text().strip()
         if text:
-            loader = self.tabs_box.active_loader()
+            loader = self.tabs_box.call("active_loader") if hasattr(self.tabs_box, "call") else self.tabs_box.active_loader()
             if loader:
                 loader.load_url(text)
 

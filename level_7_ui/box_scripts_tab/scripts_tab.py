@@ -4,10 +4,12 @@ from PyQt6.QtWidgets import (
     QListWidget, QListWidgetItem, QMessageBox, QCheckBox
 )
 from ui.dialogs import ScriptEditDialog
+from level_0.level_base import Box
 from logger import browser_logger
 
-class ScriptsTabBox:
+class ScriptsTabBox(Box):
     def __init__(self, settings, session, script_manager):
+        super().__init__("scripts_tab")
         self.settings = settings
         self.session = session
         self.script_manager = script_manager

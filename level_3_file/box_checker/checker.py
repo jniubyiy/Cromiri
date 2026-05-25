@@ -1,9 +1,13 @@
 import os
+from level_0.level_base import Box
 from logger import browser_logger
 
 REQUIRED_DIRS = ["browser_data", "settings", "session", "extensions", "logs", "builtin_extensions"]
 
-class FileCheckerBox:
+class FileCheckerBox(Box):
+    def __init__(self):
+        super().__init__("checker")
+
     def ensure_required_dirs(self):
         base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
         for dirname in REQUIRED_DIRS:

@@ -1,5 +1,8 @@
-class SettingsConfigBox:
+from level_0.level_base import Box
+
+class SettingsConfigBox(Box):
     def __init__(self):
+        super().__init__("config")
         self._data = {}
     def set_data(self, data):
         self._data = data

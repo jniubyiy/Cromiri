@@ -1,13 +1,18 @@
 from PyQt6.QtCore import QPropertyAnimation, QEasingCurve, QParallelAnimationGroup
 from PyQt6.QtWidgets import QWidget, QHBoxLayout, QTabBar
+from level_0.level_base import Box
 
-class MainTabsBox:
+class MainTabsBox(Box):
     def __init__(self):
+        super().__init__("main_tabs")
         self._widget = None
         self.tab_bar = None
         self.anim_group = None
         self.full_width = 0
         self.full_height = 0
+
+    def get_tab_bar(self):
+        return self.tab_bar
 
     def create_widget(self, parent=None):
         self._widget = QWidget(parent)

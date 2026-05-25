@@ -1,11 +1,14 @@
 import json, os
 from datetime import datetime
+from level_0.level_base import Box
 from logger import browser_logger
 
-class BufferBox:
+class BufferBox(Box):
     def __init__(self):
+        super().__init__("buffer")
         self.buffers = {"actions":[], "navigation":[], "settings_changes":[], "page_events":[]}
         self.files = {}
+
     def load_all(self, base_dir):
         dirs = {
             "actions": os.path.join(base_dir, "actions"),
@@ -26,6 +29,7 @@ class BufferBox:
                         self.buffers[key] = data
                 except Exception as e:
                     browser_logger.exception(f"Buffer load error {key}: {e}")
+
     def save_all(self):
         for key, path in self.files.items():
             try:
@@ -33,6 +37,7 @@ class BufferBox:
                     json.dump(self.buffers[key], f, indent=2, ensure_ascii=False)
             except Exception as e:
                 browser_logger.exception(f"Buffer save error {key}: {e}")
+
     def log_action(self, action_type, details=None):
         self.buffers["actions"].append({
             "timestamp": datetime.now().isoformat(),

@@ -1,8 +1,10 @@
-import json
-import os
+import json, os
+from level_0.level_base import Box
 from logger import browser_logger
 
-class SettingsIOBox:
+class SettingsIOBox(Box):
+    def __init__(self):
+        super().__init__("io")
     def load(self, filepath):
         if not os.path.exists(filepath):
             return {}

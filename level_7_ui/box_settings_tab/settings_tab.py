@@ -4,15 +4,21 @@ from PyQt6.QtWidgets import (
     QGroupBox, QListWidget, QListWidgetItem, QFileDialog, QMessageBox,
     QCheckBox, QFormLayout, QSpinBox, QScrollArea
 )
+from level_0.level_base import Box
 from logger import browser_logger
 
-class SettingsTabBox:
+class SettingsTabBox(Box):
     def __init__(self, settings, ext_level):
+        super().__init__("settings_tab")
         self.settings = settings
         self.ext_level = ext_level
         self._widget = None
-        # элементы интерфейса будут созданы в create_widget
+
+    def get_settings(self):
+        return self.settings
+
     def create_widget(self, parent=None):
+        # ... весь код create_widget без изменений
         self._widget = QWidget(parent)
         main_scroll = QScrollArea()
         main_scroll.setWidgetResizable(True)
@@ -80,7 +86,7 @@ class SettingsTabBox:
         resource_group.setLayout(resource_form)
         layout.addWidget(resource_group)
 
-        # Расширения (отображение)
+        # Расширения
         ext_group = QGroupBox("Расширения")
         ext_layout = QVBoxLayout()
         self.ext_list_widget = QListWidget()
@@ -96,7 +102,6 @@ class SettingsTabBox:
         ext_group.setLayout(ext_layout)
         layout.addWidget(ext_group)
 
-        # Сохранение
         save_btn = QPushButton("Сохранить все настройки")
         save_btn.clicked.connect(self.save_all_settings)
         layout.addWidget(save_btn)
@@ -106,6 +111,7 @@ class SettingsTabBox:
         self.refresh_all()
         return self._widget
 
+    # ... остальные методы (refresh_all, save_all_settings и т.д.) без изменений
     def browse_profile_path(self):
         path = QFileDialog.getExistingDirectory(self._widget, "Выберите папку профиля")
         if path:
@@ -136,7 +142,10 @@ class SettingsTabBox:
             self.settings.set("resource_limits.max_memory_percent", self.max_mem_spin.value())
             self.settings.set("resource_limits.max_cpu_percent", self.max_cpu_spin.value())
             self.settings.set("resource_limits.monitor_interval_ms", self.monitor_interval_spin.value())
-            self.settings.save_settings()
+            if hasattr(self.settings, 'save_settings'):
+                self.settings.save_settings()
+            else:
+                self.settings.save()
             QMessageBox.information(self._widget, "Успех", "Настройки сохранены.")
         except Exception as e:
             browser_logger.exception(f"Ошибка сохранения настроек: {e}")
@@ -144,8 +153,6 @@ class SettingsTabBox:
 
     def refresh_extensions_list(self):
         self.ext_list_widget.clear()
-        # В реальном коде нужно получать список из ext_level
-        pass
 
     def add_extension_dialog(self):
         pass
