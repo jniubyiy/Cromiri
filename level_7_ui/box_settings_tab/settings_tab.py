@@ -1,15 +1,12 @@
 from PyQt6.QtCore import Qt, QPropertyAnimation, QEasingCurve, QParallelAnimationGroup
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout,
-    QPushButton, QLabel, QLineEdit,
-    QListWidget, QListWidgetItem, QFileDialog,
-    QMessageBox, QCheckBox, QFormLayout,
-    QSpinBox, QScrollArea, QSizePolicy,
-    QComboBox, QDoubleSpinBox, QInputDialog
+    QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QLineEdit,
+    QListWidget, QListWidgetItem, QFileDialog, QMessageBox, QCheckBox,
+    QFormLayout, QSpinBox, QScrollArea, QSizePolicy, QComboBox,
+    QDoubleSpinBox, QInputDialog
 )
 from level_0.level_base import Box
 from logger import browser_logger
-
 
 class CollapsibleSection(QWidget):
     def __init__(self, title, parent=None):
@@ -25,17 +22,10 @@ class CollapsibleSection(QWidget):
         self.toggle_btn.clicked.connect(self._toggle)
         self.toggle_btn.setStyleSheet("""
             QPushButton {
-                text-align: left;
-                padding: 8px;
-                border: 1px solid #999;
-                border-radius: 4px;
-                background-color: #f0f0f0;
-                font-weight: bold;
+                text-align: left; padding: 8px; border: 1px solid #999; border-radius: 4px; background-color: #f0f0f0; font-weight: bold;
             }
             QPushButton:checked {
-                background-color: #e0e0e0;
-                border-bottom-left-radius: 0px;
-                border-bottom-right-radius: 0px;
+                background-color: #e0e0e0; border-bottom-left-radius: 0px; border-bottom-right-radius: 0px;
             }
         """)
         layout.addWidget(self.toggle_btn)
@@ -66,7 +56,6 @@ class CollapsibleSection(QWidget):
     def _animate(self, expand):
         if self._animation and self._animation.state() == QParallelAnimationGroup.State.Running:
             self._animation.stop()
-
         if expand:
             self.content_area.setVisible(True)
             self.content_area.adjustSize()
@@ -87,7 +76,6 @@ class CollapsibleSection(QWidget):
             self._animation.finished.connect(lambda: self.content_area.setVisible(False))
         self._animation.start()
 
-
 class SettingsTabBox(Box):
     def __init__(self, settings, ext_level):
         super().__init__("settings_tab")
@@ -96,7 +84,6 @@ class SettingsTabBox(Box):
         self._widget = None
         self.user_changed_callback = None
         self.settings_saved_callback = None
-
         # Элементы интерфейса
         self.homepage_edit = None
         self.restore_session_check = None
@@ -137,7 +124,6 @@ class SettingsTabBox(Box):
 
     def create_widget(self, parent=None):
         self._widget = QWidget(parent)
-
         main_scroll = QScrollArea()
         main_scroll.setWidgetResizable(True)
         container = QWidget()
@@ -280,9 +266,7 @@ class SettingsTabBox(Box):
         proxy_form = QFormLayout()
         self.proxy_type_combo = QComboBox()
         self.proxy_type_combo.addItems([
-            self.settings.tr("proxy.none"),
-            "HTTP",
-            "SOCKS5"
+            self.settings.tr("proxy.none"), "HTTP", "SOCKS5"
         ])
         proxy_form.addRow(self.settings.tr("settings.proxy_type"), self.proxy_type_combo)
         self.proxy_host_edit = QLineEdit()
@@ -333,11 +317,10 @@ class SettingsTabBox(Box):
         reset_btn.clicked.connect(self.reset_to_defaults)
         button_layout.addWidget(reset_btn)
         main_layout.addLayout(button_layout)
-
         main_layout.addStretch()
+
         self._widget.setLayout(QVBoxLayout())
         self._widget.layout().addWidget(main_scroll)
-
         self.refresh_all()
         return self._widget
 
@@ -400,7 +383,6 @@ class SettingsTabBox(Box):
         old_lang = self.settings.get_current_lang()
         if new_lang != old_lang:
             self.settings.load_language(new_lang)
-
         self.settings.set("startup.homepage", self.homepage_edit.text().strip())
         self.settings.set("startup.restore_session", self.restore_session_check.isChecked())
         self.settings.set("profile_path", self.profile_path_edit.text().strip())
@@ -428,7 +410,6 @@ class SettingsTabBox(Box):
         self.settings.save_settings()
         QMessageBox.information(self._widget, "Сохранено", self.settings.tr("settings.saved"))
         browser_logger.info("Настройки сохранены через UI")
-
         if self.settings_saved_callback:
             self.settings_saved_callback()
 
@@ -465,9 +446,8 @@ class SettingsTabBox(Box):
         self.settings.save_settings()
         self.refresh_all()
         QMessageBox.information(self._widget, "Сброс", self.settings.tr("settings.reset_done"))
-        browser_logger.info("Настройки сброшены")
+        browser_logger.info("Настройки сброшены к значениям по умолчанию")
 
-    # Управление пользователями
     def get_users(self):
         return self.settings.get("users.list", ["Default"])
 
@@ -539,8 +519,9 @@ class SettingsTabBox(Box):
             self.user_changed_callback(name)
 
     def retranslate_ui(self):
-        # Обновление текстов при смене языка – для простоты не реализовано динамически,
-        # так как требуется пересоздание виджета. При необходимости можно вызвать recreate.
+        # Обновление текстов при смене языка – для простоты не
+        # реализовано динамически, так как требуется пересоздание виджета.
+        # При необходимости можно вызвать recreate.
         pass
 
     def refresh_extensions_list(self, ext_list_widget=None):

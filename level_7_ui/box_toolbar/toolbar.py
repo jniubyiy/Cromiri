@@ -1,14 +1,14 @@
 from PyQt6.QtCore import QUrl
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout,
-    QPushButton, QLineEdit
+    QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLineEdit
 )
 from level_0.level_base import Box
+from logger import browser_logger
 
 class ToolbarBox(Box):
     def __init__(self, tabs_wrapper, settings):
         super().__init__("toolbar")
-        self.tabs_wrapper = tabs_wrapper      # обёртка TabsBox
+        self.tabs_wrapper = tabs_wrapper
         self.settings = settings
         self._widget = None
         self.ext_icons_container = None
@@ -56,34 +56,54 @@ class ToolbarBox(Box):
         return self._widget
 
     def go_back(self):
+        browser_logger.info("Действие пользователя: нажата кнопка 'Назад'")
         loader = self.tabs_wrapper.call("active_loader")
         if loader:
+            browser_logger.info("Браузер выполняет переход назад")
             loader.back()
+        else:
+            browser_logger.warning("Нет активного загрузчика для кнопки 'Назад'")
 
     def go_forward(self):
+        browser_logger.info("Действие пользователя: нажата кнопка 'Вперёд'")
         loader = self.tabs_wrapper.call("active_loader")
         if loader:
+            browser_logger.info("Браузер выполняет переход вперёд")
             loader.forward()
+        else:
+            browser_logger.warning("Нет активного загрузчика для кнопки 'Вперёд'")
 
     def go_refresh(self):
+        browser_logger.info("Действие пользователя: нажата кнопка 'Обновить'")
         loader = self.tabs_wrapper.call("active_loader")
         if loader:
+            browser_logger.info("Браузер перезагружает страницу")
             loader.reload()
+        else:
+            browser_logger.warning("Нет активного загрузчика для кнопки 'Обновить'")
 
     def navigate(self):
         text = self.address_bar.text().strip()
+        browser_logger.info(f"Действие пользователя: ввод адреса '{text}' в адресную строку")
         if text:
             loader = self.tabs_wrapper.call("active_loader")
             if loader:
+                browser_logger.info(f"Браузер загружает URL: {text}")
                 loader.load_url(text)
+            else:
+                browser_logger.warning("Нет активного загрузчика для перехода по URL")
 
     def update_for_view(self, view):
-        self.address_bar.setText(view.url().toString())
+        url = view.url().toString()
+        self.address_bar.setText(url)
         self.address_bar.setCursorPosition(0)
+        browser_logger.debug(f"Адресная строка обновлена: {url}")
 
     def update_address_bar(self, url: QUrl):
-        self.address_bar.setText(url.toString())
+        url_str = url.toString()
+        self.address_bar.setText(url_str)
         self.address_bar.setCursorPosition(0)
+        browser_logger.debug(f"Адресная строка синхронизирована: {url_str}")
 
     def update_extension_icons(self, ext_manager=None, builtin_ext_mgr=None):
         pass

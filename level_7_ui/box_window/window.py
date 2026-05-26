@@ -1,12 +1,10 @@
 from PyQt6.QtCore import QUrl, Qt, QEvent, QStandardPaths
 from PyQt6.QtWidgets import (
-    QMainWindow, QWidget, QVBoxLayout,
-    QStackedWidget
+    QMainWindow, QWidget, QVBoxLayout, QStackedWidget
 )
 from PyQt6.QtWebEngineCore import QWebEngineProfile, QWebEngineDownloadRequest
 from level_0.level_base import Box
 from logger import browser_logger
-
 
 class WindowBox(Box):
     def __init__(self, boxes_raw: dict, box_wrappers: dict, settings):
@@ -17,7 +15,6 @@ class WindowBox(Box):
 
     def build(self) -> QMainWindow:
         return BrowserMainWindow(self.boxes_raw, self.box_wrappers, self.settings)
-
 
 class BrowserMainWindow(QMainWindow):
     def __init__(self, boxes_raw: dict, box_wrappers: dict, settings):
@@ -38,7 +35,6 @@ class BrowserMainWindow(QMainWindow):
         self.update_profile_path()
         self.apply_download_settings()
         self.profile.downloadRequested.connect(self.handle_download_request)
-
         if self.extensions:
             self.extensions.set_profile(self.profile)
 
@@ -74,7 +70,7 @@ class BrowserMainWindow(QMainWindow):
         self.settings_widget = self.settings_tab.call("create_widget", self)
         self.scripts_widget = self.scripts_tab.call("create_widget", self)
 
-        self.content_stack.addWidget(self.view_tab)      # 0
+        self.content_stack.addWidget(self.view_tab)        # 0
         self.content_stack.addWidget(self.settings_widget) # 1
         self.content_stack.addWidget(self.scripts_widget)  # 2
 
@@ -110,7 +106,7 @@ class BrowserMainWindow(QMainWindow):
             browser_logger.info(f"Загрузка начата: {download.downloadFileName()}")
 
     def on_user_changed(self, username):
-        browser_logger.info(f"Переключение на пользователя {username}")
+        browser_logger.info(f"Действие пользователя: переключение на профиль '{username}'")
         self.tabs.call("save_session")
         self.update_profile_path()
         while self.page_stack.count() > 0:
@@ -121,6 +117,7 @@ class BrowserMainWindow(QMainWindow):
         if self.page_stack.count() == 0:
             homepage = self.settings.get("startup.homepage", "about:blank")
             self.tabs.call("add_new_page_tab", QUrl(homepage))
+        browser_logger.info(f"Браузер переключился на профиль '{username}'")
 
     def on_settings_saved(self):
         browser_logger.info("Применение сохранённых настроек...")
@@ -138,6 +135,7 @@ class BrowserMainWindow(QMainWindow):
         self.scripts_tab.call("retranslate_ui")
 
     def on_main_tab_changed(self, index):
+        browser_logger.info(f"Действие пользователя: переключение на главную вкладку {index} (0-Просмотр,1-Настройки,2-Скрипты)")
         self.content_stack.setCurrentIndex(index)
         if index == 1:
             self.settings_tab.call("refresh_all")
@@ -148,16 +146,24 @@ class BrowserMainWindow(QMainWindow):
         if self.main_tabs_visible:
             self.main_tabs.call("hide_panel")
             self.main_tabs_visible = False
+            browser_logger.info("Панель главных вкладок скрыта")
         else:
             self.main_tabs.call("show_panel")
             self.main_tabs_visible = True
+            browser_logger.info("Панель главных вкладок показана")
 
     def eventFilter(self, obj, event):
         if event.type() == QEvent.Type.KeyPress:
             if event.key() == Qt.Key.Key_F11:
-                self.showNormal() if self.isFullScreen() else self.showFullScreen()
+                if self.isFullScreen():
+                    self.showNormal()
+                    browser_logger.info("Выход из полноэкранного режима")
+                else:
+                    self.showFullScreen()
+                    browser_logger.info("Переход в полноэкранный режим")
                 return True
             elif event.key() == Qt.Key.Key_F5:
+                browser_logger.info("Нажата F5 – обновление страницы")
                 loader = self.tabs.call("active_loader")
                 if loader:
                     loader.reload()
@@ -168,5 +174,6 @@ class BrowserMainWindow(QMainWindow):
         pass
 
     def closeEvent(self, event):
+        browser_logger.info("Закрытие браузера, сохранение сессии")
         self.tabs.call("save_session")
         event.accept()
