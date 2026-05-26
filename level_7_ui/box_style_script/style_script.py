@@ -1,7 +1,6 @@
 from style_manager import StyleManager
 from site_scripts import SiteScriptManager
 from level_0.level_base import Box
-from logger import browser_logger
 
 class StyleScriptBox(Box):
     def __init__(self, settings):

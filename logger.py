@@ -1,4 +1,3 @@
-# logger.py
 import logging
 import os
 import sys
@@ -22,8 +21,8 @@ class BrowserLogger:
         if log_dir is None:
             log_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logs")
         os.makedirs(log_dir, exist_ok=True)
-        self.log_file = os.path.join(log_dir, "browser.log")
 
+        self.log_file = os.path.join(log_dir, "browser.log")
         self.logger = logging.getLogger("browser")
         self.logger.setLevel(level)
 
@@ -32,18 +31,15 @@ class BrowserLogger:
             datefmt='%Y-%m-%d %H:%M:%S'
         )
 
-        # Ротируемый файловый обработчик: 5 МБ, до 3 бэкапов
+        # Файловый обработчик: 5 МБ, до 3 бэкапов
         file_handler = RotatingFileHandler(
             self.log_file, maxBytes=5*1024*1024, backupCount=3, encoding='utf-8'
         )
-        file_handler.setLevel(level)
+        file_handler.setLevel(level)  # DEBUG — будут записаны все вызовы боксов
         file_handler.setFormatter(formatter)
         self.logger.addHandler(file_handler)
 
-        console_handler = logging.StreamHandler(sys.stdout)
-        console_handler.setLevel(logging.WARNING)
-        console_handler.setFormatter(formatter)
-        self.logger.addHandler(console_handler)
+        # Консольный обработчик полностью убран
 
         self.logger.info("=" * 50)
         self.logger.info("Запуск браузера")

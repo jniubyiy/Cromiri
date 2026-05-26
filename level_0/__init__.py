@@ -6,13 +6,13 @@ class LevelZero:
     def __init__(self):
         self._loaded_levels: Dict[str, LevelWrapper] = {}
         self._init_sequence = [
-            {"name": "DeviceLevel",     "module": "level_1_device",     "class": "DeviceLevelWrapper",      "deps": []},
-            {"name": "ResourceLevel",   "module": "level_2_resource",   "class": "ResourceLevelWrapper",    "deps": ["DeviceLevel"]},
-            {"name": "FileLevel",       "module": "level_3_file",       "class": "FileLevelWrapper",        "deps": []},
-            {"name": "SettingsLevel",   "module": "level_4_settings",   "class": "SettingsLevelWrapper",    "deps": []},
-            {"name": "SessionLevel",    "module": "level_5_session",    "class": "SessionLevelWrapper",     "deps": []},
-            {"name": "ExtensionsLevel", "module": "level_6_extensions", "class": "ExtensionsLevelWrapper",  "deps": ["SettingsLevel"]},
-            {"name": "UILevel",         "module": "level_7_ui",         "class": "UILevelWrapper",          "deps": ["SettingsLevel", "SessionLevel", "ExtensionsLevel"]},
+            {"name": "DeviceLevel", "module": "level_1_device", "class": "DeviceLevelWrapper", "deps": []},
+            {"name": "ResourceLevel", "module": "level_2_resource", "class": "ResourceLevelWrapper", "deps": ["DeviceLevel"]},
+            {"name": "FileLevel", "module": "level_3_file", "class": "FileLevelWrapper", "deps": []},
+            {"name": "SettingsLevel", "module": "level_4_settings", "class": "SettingsLevelWrapper", "deps": []},
+            {"name": "SessionLevel", "module": "level_5_session", "class": "SessionLevelWrapper", "deps": ["SettingsLevel"]},
+            {"name": "ExtensionsLevel", "module": "level_6_extensions", "class": "ExtensionsLevelWrapper", "deps": ["SettingsLevel"]},
+            {"name": "UILevel", "module": "level_7_ui", "class": "UILevelWrapper", "deps": ["SettingsLevel", "SessionLevel", "ExtensionsLevel"]},
         ]
         self.levels: List[LevelWrapper] = []
 
@@ -23,6 +23,7 @@ class LevelZero:
             module_path = entry["module"]
             class_name = entry["class"]
             dep_names = entry["deps"]
+
             try:
                 import importlib
                 module = importlib.import_module(module_path)
@@ -39,9 +40,10 @@ class LevelZero:
             except Exception as e:
                 browser_logger.exception(f"КРИТИЧЕСКАЯ ОШИБКА загрузки уровня {name}: {e}")
                 raise SystemExit(1) from e
-        # Связываем соседей (по порядку загрузки)
+
         for i, level in enumerate(self.levels):
             lower = self.levels[i-1] if i > 0 else None
             upper = self.levels[i+1] if i < len(self.levels)-1 else None
             level.set_neighbors(lower=lower, upper=upper)
+
         browser_logger.info("Все уровни активированы и связаны")

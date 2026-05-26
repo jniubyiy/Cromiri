@@ -79,8 +79,8 @@ class LevelCore(ABC):
 # -------------------------------------------------------------------
 class LevelRequest:
     """Структура запроса, путешествующего по цепочке уровней."""
-    def __init__(self, target_level: str, box_name: str, method: str,
-                 args: tuple, kwargs: dict, source_level: str):
+    def __init__(self, target_level: str, box_name: str, method: str, args: tuple,
+                 kwargs: dict, source_level: str):
         self.target_level = target_level
         self.box_name = box_name
         self.method = method
@@ -101,8 +101,8 @@ class LevelWrapper(ABC):
     """
     def __init__(self, core: LevelCore):
         self._core = core
-        self._upper: Optional[LevelWrapper] = None   # сосед сверху (больший номер)
-        self._lower: Optional[LevelWrapper] = None   # сосед снизу (меньший номер)
+        self._upper: Optional[LevelWrapper] = None  # сосед сверху (больший номер)
+        self._lower: Optional[LevelWrapper] = None  # сосед снизу (меньший номер)
         self._allowed_incoming: Dict[str, List[str]] = {}  # {source_level: [methods]}
         # Публичные методы, которые можно вызывать напрямую (для старого API)
         self._public_api: set[str] = set()
@@ -140,8 +140,14 @@ class LevelWrapper(ABC):
         # Иначе передаём дальше
         direction = self._get_direction(request.target_level)
         if direction == "upper" and self._upper is not None:
+            browser_logger.debug(
+                f"[{self._core.level_name}] Передача запроса вверх к '{self._upper._core.level_name}'"
+            )
             return self._upper.handle_request(request)
         elif direction == "lower" and self._lower is not None:
+            browser_logger.debug(
+                f"[{self._core.level_name}] Передача запроса вниз к '{self._lower._core.level_name}'"
+            )
             return self._lower.handle_request(request)
         else:
             raise RuntimeError(
@@ -149,9 +155,13 @@ class LevelWrapper(ABC):
             )
 
     # ---- Отправка запроса от своего имени ----
-    def send_request(self, target_level: str, box_name: str,
-                     method: str, *args, **kwargs) -> Any:
+    def send_request(self, target_level: str, box_name: str, method: str,
+                     *args, **kwargs) -> Any:
         """Отправить запрос к другому уровню (начиная с себя)."""
+        browser_logger.debug(
+            f"[{self._core.level_name}] Отправка запроса к '{target_level}' "
+            f"box='{box_name}' method='{method}'"
+        )
         request = LevelRequest(
             target_level=target_level,
             box_name=box_name,
@@ -160,7 +170,6 @@ class LevelWrapper(ABC):
             kwargs=kwargs,
             source_level=self._core.level_name
         )
-        # Проверяем исходящие права? Пока пропускаем.
         return self.handle_request(request)
 
     # ---- Вспомогательные методы ----
@@ -184,13 +193,12 @@ class LevelWrapper(ABC):
         if name.startswith('_'):
             raise AttributeError(f"Доступ к защищённому атрибуту {name} запрещён")
         if name in self._public_api:
+            browser_logger.debug(
+                f"[{self._core.level_name}] Прямой вызов публичного метода '{name}'"
+            )
             func = getattr(self._core, name, None)
             if func is not None:
                 return func
         raise AttributeError(
             f"'{name}' не является публичным методом уровня '{self._core.level_name}'"
         )
-
-    @abstractmethod
-    def initialize(self):
-        pass

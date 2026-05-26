@@ -1,17 +1,22 @@
 from PyQt6.QtCore import QUrl
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLineEdit, QToolButton
+    QWidget, QVBoxLayout, QHBoxLayout,
+    QPushButton, QLineEdit
 )
 from level_0.level_base import Box
-from logger import browser_logger
 
 class ToolbarBox(Box):
-    def __init__(self, tabs_box):
+    def __init__(self, tabs_wrapper, settings):
         super().__init__("toolbar")
-        self.tabs_box = tabs_box
+        self.tabs_wrapper = tabs_wrapper      # обёртка TabsBox
+        self.settings = settings
         self._widget = None
         self.ext_icons_container = None
         self.ext_icons_layout = None
+        self.btn_back = None
+        self.btn_forward = None
+        self.btn_refresh = None
+        self.address_bar = None
 
     def create_widget(self, parent=None):
         self._widget = QWidget(parent)
@@ -30,19 +35,20 @@ class ToolbarBox(Box):
         nav_layout.setContentsMargins(0, 0, 0, 0)
         nav_layout.setSpacing(2)
 
-        self.btn_back = QPushButton("←")
+        self.btn_back = QPushButton(self.settings.tr("tab.back"))
         self.btn_back.clicked.connect(self.go_back)
         nav_layout.addWidget(self.btn_back)
 
-        self.btn_forward = QPushButton("→")
+        self.btn_forward = QPushButton(self.settings.tr("tab.forward"))
         self.btn_forward.clicked.connect(self.go_forward)
         nav_layout.addWidget(self.btn_forward)
 
-        self.btn_refresh = QPushButton("⟳")
+        self.btn_refresh = QPushButton(self.settings.tr("tab.refresh"))
         self.btn_refresh.clicked.connect(self.go_refresh)
         nav_layout.addWidget(self.btn_refresh)
 
         self.address_bar = QLineEdit()
+        self.address_bar.setPlaceholderText(self.settings.tr("toolbar.address_placeholder"))
         self.address_bar.returnPressed.connect(self.navigate)
         nav_layout.addWidget(self.address_bar, 1)
 
@@ -50,24 +56,24 @@ class ToolbarBox(Box):
         return self._widget
 
     def go_back(self):
-        loader = self.tabs_box.call("active_loader") if hasattr(self.tabs_box, "call") else self.tabs_box.active_loader()
+        loader = self.tabs_wrapper.call("active_loader")
         if loader:
             loader.back()
 
     def go_forward(self):
-        loader = self.tabs_box.call("active_loader") if hasattr(self.tabs_box, "call") else self.tabs_box.active_loader()
+        loader = self.tabs_wrapper.call("active_loader")
         if loader:
             loader.forward()
 
     def go_refresh(self):
-        loader = self.tabs_box.call("active_loader") if hasattr(self.tabs_box, "call") else self.tabs_box.active_loader()
+        loader = self.tabs_wrapper.call("active_loader")
         if loader:
             loader.reload()
 
     def navigate(self):
         text = self.address_bar.text().strip()
         if text:
-            loader = self.tabs_box.call("active_loader") if hasattr(self.tabs_box, "call") else self.tabs_box.active_loader()
+            loader = self.tabs_wrapper.call("active_loader")
             if loader:
                 loader.load_url(text)
 
@@ -80,33 +86,10 @@ class ToolbarBox(Box):
         self.address_bar.setCursorPosition(0)
 
     def update_extension_icons(self, ext_manager=None, builtin_ext_mgr=None):
-        while self.ext_icons_layout.count():
-            item = self.ext_icons_layout.takeAt(0)
-            w = item.widget()
-            if w:
-                w.deleteLater()
-        webengine_exts = []
-        if ext_manager and hasattr(ext_manager, 'get_installed_names'):
-            for name in ext_manager.get_installed_names():
-                if ext_manager.is_enabled(name):
-                    webengine_exts.append(name)
-        builtin_exts = []
-        if builtin_ext_mgr:
-            builtin_exts = builtin_ext_mgr.get_activated_extensions()
-        if not webengine_exts and not builtin_exts:
-            self.ext_icons_container.hide()
-            return
-        for name in webengine_exts:
-            btn = QToolButton()
-            btn.setText(name[:2].upper())
-            btn.setToolTip(name)
-            btn.setFixedSize(24, 24)
-            self.ext_icons_layout.addWidget(btn)
-        for name in builtin_exts:
-            btn = QToolButton()
-            btn.setText(name[:2].upper())
-            btn.setToolTip(f"[B] {name}")
-            btn.setFixedSize(24, 24)
-            self.ext_icons_layout.addWidget(btn)
-        self.ext_icons_layout.addStretch()
-        self.ext_icons_container.show()
+        pass
+
+    def retranslate_ui(self):
+        self.btn_back.setText(self.settings.tr("tab.back"))
+        self.btn_forward.setText(self.settings.tr("tab.forward"))
+        self.btn_refresh.setText(self.settings.tr("tab.refresh"))
+        self.address_bar.setPlaceholderText(self.settings.tr("toolbar.address_placeholder"))

@@ -1,11 +1,11 @@
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel,
-    QListWidget, QListWidgetItem, QMessageBox, QCheckBox
+    QWidget, QVBoxLayout, QHBoxLayout,
+    QPushButton, QLabel, QListWidget,
+    QListWidgetItem, QMessageBox, QCheckBox
 )
 from ui.dialogs import ScriptEditDialog
 from level_0.level_base import Box
-from logger import browser_logger
 
 class ScriptsTabBox(Box):
     def __init__(self, settings, session, script_manager):
@@ -19,22 +19,24 @@ class ScriptsTabBox(Box):
     def create_widget(self, parent=None):
         self._widget = QWidget(parent)
         layout = QVBoxLayout()
+
         self.scripts_list = QListWidget()
         self.refresh_scripts_list()
-        layout.addWidget(QLabel("Пользовательские скрипты:"))
+        layout.addWidget(QLabel(self.settings.tr("scripts.section")))
         layout.addWidget(self.scripts_list)
 
         btn_layout = QHBoxLayout()
-        btn_add = QPushButton("➕ Добавить")
+        btn_add = QPushButton(self.settings.tr("scripts.add"))
         btn_add.clicked.connect(self.add_script_dialog)
         btn_layout.addWidget(btn_add)
-        btn_edit = QPushButton("✏️ Редактировать")
+        btn_edit = QPushButton(self.settings.tr("scripts.edit"))
         btn_edit.clicked.connect(self.edit_script_dialog)
         btn_layout.addWidget(btn_edit)
-        btn_remove = QPushButton("➖ Удалить")
+        btn_remove = QPushButton(self.settings.tr("scripts.remove"))
         btn_remove.clicked.connect(self.remove_script_dialog)
         btn_layout.addWidget(btn_remove)
         layout.addLayout(btn_layout)
+
         self._widget.setLayout(layout)
         return self._widget
 
@@ -65,7 +67,7 @@ class ScriptsTabBox(Box):
         self.refresh_scripts_list()
 
     def add_script_dialog(self):
-        dialog = ScriptEditDialog(self._widget)
+        dialog = ScriptEditDialog(self._widget, settings=self.settings)
         if dialog.exec():
             name, desc, pattern, code = dialog.get_data()
             self.script_manager.add_script(name, desc, pattern, code)
@@ -74,10 +76,10 @@ class ScriptsTabBox(Box):
     def edit_script_dialog(self):
         row = self.scripts_list.currentRow()
         if row < 0:
-            QMessageBox.warning(self._widget, "Ошибка", "Выберите скрипт для редактирования.")
+            QMessageBox.warning(self._widget, "Ошибка", self.settings.tr("scripts.error.no_selection"))
             return
         script = self.script_manager.get_scripts()[row]
-        dialog = ScriptEditDialog(self._widget, script.name, script.description, script.pattern, script.code)
+        dialog = ScriptEditDialog(self._widget, script.name, script.description, script.pattern, script.code, settings=self.settings)
         if dialog.exec():
             name, desc, pattern, code = dialog.get_data()
             self.script_manager.update_script(row, name, desc, pattern, code)
@@ -86,14 +88,11 @@ class ScriptsTabBox(Box):
     def remove_script_dialog(self):
         row = self.scripts_list.currentRow()
         if row < 0:
-            QMessageBox.warning(self._widget, "Ошибка", "Выберите скрипт для удаления.")
+            QMessageBox.warning(self._widget, "Ошибка", self.settings.tr("scripts.error.no_selection_remove"))
             return
-        script = self.script_manager.get_scripts()[row]
-        reply = QMessageBox.question(
-            self._widget, "Подтверждение",
-            f"Удалить скрипт '{script.name}'?",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
-        )
-        if reply == QMessageBox.StandardButton.Yes:
-            self.script_manager.remove_script(row)
-            self.refresh_scripts_list()
+        self.script_manager.remove_script(row)
+        self.refresh_scripts_list()
+
+    def retranslate_ui(self):
+        # Заголовок и кнопки обновятся при пересоздании виджета, можно не усложнять
+        pass

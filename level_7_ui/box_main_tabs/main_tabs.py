@@ -3,8 +3,9 @@ from PyQt6.QtWidgets import QWidget, QHBoxLayout, QTabBar
 from level_0.level_base import Box
 
 class MainTabsBox(Box):
-    def __init__(self):
+    def __init__(self, settings):
         super().__init__("main_tabs")
+        self.settings = settings
         self._widget = None
         self.tab_bar = None
         self.anim_group = None
@@ -21,9 +22,9 @@ class MainTabsBox(Box):
         layout.setSpacing(0)
 
         self.tab_bar = QTabBar()
-        self.tab_bar.addTab(" Просмотр")
-        self.tab_bar.addTab("⚙️ Настройки")
-        self.tab_bar.addTab(" Скрипты")
+        self.tab_bar.addTab(self.settings.tr("main_tabs.view"))
+        self.tab_bar.addTab(self.settings.tr("main_tabs.settings"))
+        self.tab_bar.addTab(self.settings.tr("main_tabs.scripts"))
         layout.addWidget(self.tab_bar)
         layout.addStretch()
 
@@ -60,3 +61,9 @@ class MainTabsBox(Box):
         self.height_anim.setStartValue(self._widget.height())
         self.height_anim.setEndValue(0)
         self.anim_group.start()
+
+    def retranslate_ui(self):
+        if self.tab_bar:
+            self.tab_bar.setTabText(0, self.settings.tr("main_tabs.view"))
+            self.tab_bar.setTabText(1, self.settings.tr("main_tabs.settings"))
+            self.tab_bar.setTabText(2, self.settings.tr("main_tabs.scripts"))
