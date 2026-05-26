@@ -6,10 +6,11 @@ from level_0.level_base import Box
 from logger import browser_logger
 
 class ToolbarBox(Box):
-    def __init__(self, tabs_wrapper, settings):
+    def __init__(self, tabs_wrapper, settings, session_wrapper):
         super().__init__("toolbar")
         self.tabs_wrapper = tabs_wrapper
         self.settings = settings
+        self.session = session_wrapper   # для записи истории
         self._widget = None
         self.ext_icons_container = None
         self.ext_icons_layout = None
@@ -57,53 +58,43 @@ class ToolbarBox(Box):
 
     def go_back(self):
         browser_logger.info("Действие пользователя: нажата кнопка 'Назад'")
+        self.session.record_action("Нажата кнопка 'Назад'")
         loader = self.tabs_wrapper.call("active_loader")
         if loader:
-            browser_logger.info("Браузер выполняет переход назад")
             loader.back()
-        else:
-            browser_logger.warning("Нет активного загрузчика для кнопки 'Назад'")
 
     def go_forward(self):
         browser_logger.info("Действие пользователя: нажата кнопка 'Вперёд'")
+        self.session.record_action("Нажата кнопка 'Вперёд'")
         loader = self.tabs_wrapper.call("active_loader")
         if loader:
-            browser_logger.info("Браузер выполняет переход вперёд")
             loader.forward()
-        else:
-            browser_logger.warning("Нет активного загрузчика для кнопки 'Вперёд'")
 
     def go_refresh(self):
         browser_logger.info("Действие пользователя: нажата кнопка 'Обновить'")
+        self.session.record_action("Нажата кнопка 'Обновить'")
         loader = self.tabs_wrapper.call("active_loader")
         if loader:
-            browser_logger.info("Браузер перезагружает страницу")
             loader.reload()
-        else:
-            browser_logger.warning("Нет активного загрузчика для кнопки 'Обновить'")
 
     def navigate(self):
         text = self.address_bar.text().strip()
         browser_logger.info(f"Действие пользователя: ввод адреса '{text}' в адресную строку")
+        self.session.record_action(f"Введён URL: {text}")
         if text:
             loader = self.tabs_wrapper.call("active_loader")
             if loader:
-                browser_logger.info(f"Браузер загружает URL: {text}")
                 loader.load_url(text)
-            else:
-                browser_logger.warning("Нет активного загрузчика для перехода по URL")
 
     def update_for_view(self, view):
         url = view.url().toString()
         self.address_bar.setText(url)
         self.address_bar.setCursorPosition(0)
-        browser_logger.debug(f"Адресная строка обновлена: {url}")
 
     def update_address_bar(self, url: QUrl):
         url_str = url.toString()
         self.address_bar.setText(url_str)
         self.address_bar.setCursorPosition(0)
-        browser_logger.debug(f"Адресная строка синхронизирована: {url_str}")
 
     def update_extension_icons(self, ext_manager=None, builtin_ext_mgr=None):
         pass
