@@ -31,7 +31,7 @@ class UILevelCore(LevelCore):
         context_menu_wrapper = self.register_box(context_menu_box)
         context_menu_wrapper.expose_methods("setup_view", "set_new_tab_callback")
 
-        # 3. TabsBox (получает context_menu_wrapper)
+        # 3. TabsBox
         tabs_box = TabsBox(
             self._settings, self._session, style_script_wrapper,
             self._extensions, context_menu_wrapper
@@ -41,7 +41,7 @@ class UILevelCore(LevelCore):
             "set_stack", "set_toggle_main_callback", "create_widget", "add_new_page_tab",
             "active_loader", "restore_session", "save_session", "on_tab_changed",
             "on_url_changed", "close_tab", "set_toolbar", "retranslate_ui", "apply_settings",
-            "set_profile"   # <-- добавлено
+            "set_profile"
         )
 
         # 4. ToolbarBox

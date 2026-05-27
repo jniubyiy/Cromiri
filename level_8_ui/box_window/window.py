@@ -41,7 +41,7 @@ class BrowserMainWindow(QMainWindow):
         self.profile.downloadRequested.connect(self.handle_download_request)
         if self.extensions:
             self.extensions.set_profile(self.profile)
-        self.tabs.call("set_profile", self.profile)   # передаём профиль для будущих вкладок
+        self.tabs.call("set_profile", self.profile)
 
         self.page_stack = QStackedWidget()
         self.tabs.call("set_stack", self.page_stack)
@@ -100,15 +100,11 @@ class BrowserMainWindow(QMainWindow):
         self.main_tabs_visible = True
 
     def _setup_profile(self):
-        """
-        Создаёт постоянный профиль QWebEngineProfile для текущего пользователя.
-        Имя профиля делает его persistent, а setPersistentStoragePath определяет папку хранения.
-        """
+        """Создаёт постоянный профиль QWebEngineProfile для текущего пользователя."""
         user = self.settings.get("users.active", "Default")
         base_path = self.settings.get("profile_path", "browser_data")
         user_path = f"{base_path}/{user}" if base_path else f"browser_data/{user}"
 
-        # Уникальное имя профиля — гарантия persistent-режима
         self.profile = QWebEngineProfile(f"user_{user}")
         self.profile.setPersistentStoragePath(user_path)
         self.profile.setHttpCacheType(QWebEngineProfile.HttpCacheType.DiskHttpCache)

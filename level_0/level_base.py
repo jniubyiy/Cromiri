@@ -2,6 +2,18 @@ from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional
 from logger import browser_logger
 
+# Порядок уровней для определения приоритета (чем меньше номер, тем выше приоритет)
+LEVEL_ORDER = {
+    "DeviceLevel": 1,
+    "ResourceLevel": 2,
+    "ManagerLevel": 3,
+    "FileLevel": 4,
+    "SettingsLevel": 5,
+    "SessionLevel": 6,
+    "ExtensionsLevel": 7,
+    "UILevel": 8,
+}
+
 # -------------------------------------------------------------------
 # 1. Базовый класс бокса
 # -------------------------------------------------------------------
@@ -9,6 +21,7 @@ class Box:
     """Базовый класс для всех боксов."""
     def __init__(self, box_name: str):
         self.box_name = box_name
+        self.level_number = 99   # будет переопределён при регистрации
 
 # -------------------------------------------------------------------
 # 2. Обёртка бокса
@@ -62,6 +75,8 @@ class LevelCore(ABC):
         self._box_wrappers: Dict[str, BoxWrapper] = {}
 
     def register_box(self, box: Box) -> BoxWrapper:
+        # Устанавливаем номер уровня для приоритета
+        box.level_number = LEVEL_ORDER.get(self.level_name, 99)
         wrapper = BoxWrapper(box, self.level_name)
         self._box_wrappers[box.box_name] = wrapper
         browser_logger.info(f"[{self.level_name}] Зарегистрирован бокс '{box.box_name}'")
@@ -80,6 +95,10 @@ class LevelCore(ABC):
     def setup_boxes(self):
         """Создание и регистрация боксов."""
         pass
+
+    def reload_box(self, box_name: str):
+        """Перезагружает указанный бокс (по умолчанию не поддерживается)."""
+        raise NotImplementedError("Этот уровень не поддерживает перезагрузку боксов")
 
 # -------------------------------------------------------------------
 # 4. Запрос между уровнями
@@ -109,7 +128,6 @@ class LevelWrapper(ABC):
         self._upper: Optional[LevelWrapper] = None   # сосед сверху (больший номер)
         self._lower: Optional[LevelWrapper] = None   # сосед снизу (меньший номер)
         self._allowed_incoming: Dict[str, List[str]] = {}  # {source_level: [methods]}
-        # Публичные методы, которые можно вызывать напрямую (для старого API)
         self._public_api: set[str] = set()
 
     def set_neighbors(self, lower: Optional['LevelWrapper'] = None, upper: Optional['LevelWrapper'] = None):
@@ -123,26 +141,22 @@ class LevelWrapper(ABC):
         """Разрешает входящие запросы от указанного уровня."""
         self._allowed_incoming[source_level] = methods
 
-    # ---- Обработка входящего запроса ----
     def handle_request(self, request: LevelRequest) -> Any:
         browser_logger.info(
             f"[{self._core.level_name}] Получен запрос от '{request.source_level}' "
             f"к '{request.target_level}' -> box='{request.box_name}' method='{request.method}'"
         )
-        # Проверка прав
         allowed = self._allowed_incoming.get(request.source_level, [])
         if request.method not in allowed and "*" not in allowed:
             raise PermissionError(
                 f"Уровень '{request.source_level}' не имеет права вызывать "
                 f"'{request.method}' на уровне '{self._core.level_name}'"
             )
-        # Если запрос предназначен нам – исполняем
         if request.target_level == self._core.level_name:
             browser_logger.info(
                 f"[{self._core.level_name}] Запрос адресован этому уровню, выполняется"
             )
             return self._core.send_to_box(request.box_name, request.method, *request.args, **request.kwargs)
-        # Иначе передаём дальше
         direction = self._get_direction(request.target_level)
         if direction == "upper" and self._upper is not None:
             browser_logger.info(
@@ -159,9 +173,7 @@ class LevelWrapper(ABC):
                 f"Не удалось доставить запрос к уровню '{request.target_level}'"
             )
 
-    # ---- Отправка запроса от своего имени ----
     def send_request(self, target_level: str, box_name: str, method: str, *args, **kwargs) -> Any:
-        """Отправить запрос к другому уровню (начиная с себя)."""
         browser_logger.info(
             f"[{self._core.level_name}] Отправка запроса к '{target_level}' "
             f"box='{box_name}' method='{method}' (межуровневое взаимодействие)"
@@ -176,22 +188,11 @@ class LevelWrapper(ABC):
         )
         return self.handle_request(request)
 
-    # ---- Вспомогательные методы ----
     def _get_direction(self, target_level: str) -> str:
-        order = {
-            "DeviceLevel": 1,
-            "ResourceLevel": 2,
-            "FileLevel": 3,
-            "SettingsLevel": 4,
-            "SessionLevel": 5,
-            "ExtensionsLevel": 6,
-            "UILevel": 7,
-        }
-        current = order.get(self._core.level_name, 0)
-        target = order.get(target_level, 0)
+        current = LEVEL_ORDER.get(self._core.level_name, 0)
+        target = LEVEL_ORDER.get(target_level, 0)
         return "upper" if target > current else "lower"
 
-    # ---- Прямой доступ к публичным методам (для обратной совместимости) ----
     def __getattr__(self, name: str):
         if name.startswith('_'):
             raise AttributeError(f"Доступ к защищённому атрибуту {name} запрещён")
