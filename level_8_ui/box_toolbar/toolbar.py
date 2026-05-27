@@ -1,15 +1,16 @@
 from PyQt6.QtCore import QUrl
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout,
-    QPushButton, QLineEdit
+    QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLineEdit
 )
 from level_0.level_base import Box
+from logger import browser_logger
 
 class ToolbarBox(Box):
-    def __init__(self, tabs_wrapper, settings):
+    def __init__(self, tabs_wrapper, settings, session_wrapper):
         super().__init__("toolbar")
-        self.tabs_wrapper = tabs_wrapper      # обёртка TabsBox
+        self.tabs_wrapper = tabs_wrapper
         self.settings = settings
+        self.session = session_wrapper   # для записи истории
         self._widget = None
         self.ext_icons_container = None
         self.ext_icons_layout = None
@@ -56,33 +57,43 @@ class ToolbarBox(Box):
         return self._widget
 
     def go_back(self):
+        browser_logger.info("Действие пользователя: нажата кнопка 'Назад'")
+        self.session.record_action("Нажата кнопка 'Назад'")
         loader = self.tabs_wrapper.call("active_loader")
         if loader:
             loader.back()
 
     def go_forward(self):
+        browser_logger.info("Действие пользователя: нажата кнопка 'Вперёд'")
+        self.session.record_action("Нажата кнопка 'Вперёд'")
         loader = self.tabs_wrapper.call("active_loader")
         if loader:
             loader.forward()
 
     def go_refresh(self):
+        browser_logger.info("Действие пользователя: нажата кнопка 'Обновить'")
+        self.session.record_action("Нажата кнопка 'Обновить'")
         loader = self.tabs_wrapper.call("active_loader")
         if loader:
             loader.reload()
 
     def navigate(self):
         text = self.address_bar.text().strip()
+        browser_logger.info(f"Действие пользователя: ввод адреса '{text}' в адресную строку")
+        self.session.record_action(f"Введён URL: {text}")
         if text:
             loader = self.tabs_wrapper.call("active_loader")
             if loader:
                 loader.load_url(text)
 
     def update_for_view(self, view):
-        self.address_bar.setText(view.url().toString())
+        url = view.url().toString()
+        self.address_bar.setText(url)
         self.address_bar.setCursorPosition(0)
 
     def update_address_bar(self, url: QUrl):
-        self.address_bar.setText(url.toString())
+        url_str = url.toString()
+        self.address_bar.setText(url_str)
         self.address_bar.setCursorPosition(0)
 
     def update_extension_icons(self, ext_manager=None, builtin_ext_mgr=None):

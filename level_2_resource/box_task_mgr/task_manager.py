@@ -7,7 +7,7 @@ class TaskManagerBox(Box):
         super().__init__("task_mgr")
         self.device = device_wrapper
         self.pool = QThreadPool()
-        self.pool.setMaxThreadCount(self.device.get_available_threads())  # публичный метод device
+        self.pool.setMaxThreadCount(self.device.get_available_threads())
 
     def submit(self, func, *args, **kwargs):
         class Task(QRunnable):
@@ -16,4 +16,6 @@ class TaskManagerBox(Box):
                     func(*args, **kwargs)
                 except Exception as e:
                     browser_logger.error(f"Ошибка в фоновой задаче: {e}")
-        self.pool.start(Task())
+        # Приоритет = номер уровня (меньше номер → выше приоритет)
+        priority = self.level_number
+        self.pool.start(Task(), priority=priority)

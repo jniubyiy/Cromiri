@@ -1,21 +1,21 @@
 from PyQt6.QtCore import QUrl, QTimer
 from PyQt6.QtWidgets import (
-    QWidget, QHBoxLayout, QTabBar,
-    QStackedWidget, QPushButton
+    QWidget, QHBoxLayout, QTabBar, QStackedWidget, QPushButton
 )
 from PyQt6.QtWebEngineWidgets import QWebEngineView
+from PyQt6.QtWebEngineCore import QWebEngineProfile, QWebEnginePage
 from page_loader import PageLoader
 from level_0.level_base import Box
 from logger import browser_logger
 
-
 class TabsBox(Box):
-    def __init__(self, settings, session, style_script_wrapper, extensions_wrapper):
+    def __init__(self, settings, session, style_script_wrapper, extensions_wrapper, context_menu_wrapper):
         super().__init__("tabs")
         self.settings = settings
         self.session = session
         self.style_script_wrapper = style_script_wrapper
         self.extensions_wrapper = extensions_wrapper
+        self.context_menu = context_menu_wrapper
         self._widget = None
         self.tab_bar = None
         self.toggle_main_btn = None
@@ -26,6 +26,14 @@ class TabsBox(Box):
         self.resource_timer = None
         self._toggle_main_cb = None
         self.toolbar = None
+        self._restoring = False
+        self._pending_urls = {}
+        self.current_profile = None
+
+    def set_profile(self, profile: QWebEngineProfile):
+        """Устанавливает профиль для всех новых вкладок."""
+        self.current_profile = profile
+        browser_logger.info("Профиль для вкладок обновлён")
 
     def set_stack(self, stack: QStackedWidget):
         self.stack = stack
@@ -65,14 +73,12 @@ class TabsBox(Box):
         self.new_tab_btn.setToolTip(self.settings.tr("tab.new_tab"))
         self.new_tab_btn.clicked.connect(lambda: self.add_new_page_tab(QUrl("about:blank")))
         layout.addWidget(self.new_tab_btn)
-
         layout.addStretch()
 
         self.resource_timer = QTimer()
         self._update_timer_interval()
         self.resource_timer.timeout.connect(self._check_resource_usage)
         self.resource_timer.start()
-
         return self._widget
 
     def _on_toggle_main(self):
@@ -87,25 +93,33 @@ class TabsBox(Box):
     def apply_settings(self):
         self._update_timer_interval()
 
-    def add_new_page_tab(self, url=None, title=None):
+    def add_new_page_tab(self, url=None, title=None, load_immediately=True):
+        browser_logger.info(f"Действие пользователя: открытие новой вкладки (URL: {url.toString() if url else 'пусто'})")
         if self.stack is None:
+            browser_logger.warning("Стек вкладок не задан, невозможно создать вкладку")
             return
         max_tabs = self.settings.get("tab_limits.max_tabs", 50)
         if self.tab_bar.count() >= max_tabs:
-            browser_logger.warning("Достигнут лимит вкладок")
+            browser_logger.warning(f"Достигнут лимит вкладок ({max_tabs}), открытие запрещено")
             return
+
+        # Создаём view и назначаем страницу с профилем
         view = QWebEngineView()
+        if self.current_profile:
+            page = QWebEnginePage(self.current_profile, view)
+            view.setPage(page)
+
+        self.context_menu.call("setup_view", view)
+
         loader = PageLoader(view)
         self._loaders[view] = loader
         self._reload_counts[view] = 0
-
         view.urlChanged.connect(lambda u, v=view: self.on_url_changed(u, v))
         view.titleChanged.connect(lambda t, v=view: self._on_title_changed(t, v))
         view.loadProgress.connect(lambda p, v=view: self._on_load_progress(p, v))
         view.page().renderProcessTerminated.connect(
             lambda status, code, v=view: self._on_render_process_crashed(v)
         )
-
         self.style_script_wrapper.call("apply_styles", view)
 
         idx = self.stack.addWidget(view)
@@ -114,18 +128,27 @@ class TabsBox(Box):
         self.tab_bar.setCurrentIndex(tab_idx)
 
         if url and url.isValid():
-            loader.load_url(url.toString())
+            if load_immediately:
+                browser_logger.info(f"Браузер загружает страницу: {url.toString()}")
+                loader.load_url(url.toString())
+                self._pending_urls.pop(view, None)
+            else:
+                self._pending_urls[view] = url
+                self.tab_bar.setTabText(tab_idx, "Восстановление...")
+                browser_logger.info(f"Вкладка поставлена в очередь: {url.toString()}")
         else:
+            browser_logger.info("Браузер открывает пустую вкладку")
             loader.load_url("about:blank")
 
-        # Инжекция скриптов расширений (сразу, как для пользовательских скриптов)
         self._inject_scripts_to_view(view)
+
+        if not self._restoring:
+            self.session.record_action("Открыта новая вкладка", {"url": url.toString() if url else "about:blank"})
+            self.save_session()
 
     def _inject_scripts_to_view(self, view):
         url = view.url().toString()
-        # Пользовательские скрипты
         self.style_script_wrapper.call("inject_scripts", view, view.url())
-        # Встроенные расширения
         if self.extensions_wrapper:
             builtin_exts = self.extensions_wrapper.get_builtin_extensions()
             for ext_cls in builtin_exts:
@@ -137,32 +160,56 @@ class TabsBox(Box):
                     browser_logger.info(f"Расширение '{ext_cls.name}' внедрено на {url}")
 
     def on_tab_changed(self, index):
+        browser_logger.info(f"Действие пользователя: переключение на вкладку {index}")
         if index < 0 or not self.stack:
             return
         self.stack.setCurrentIndex(index)
         widget = self.stack.widget(index)
         if isinstance(widget, QWebEngineView):
-            self._update_toolbar(widget.url())
+            pending_url = self._pending_urls.pop(widget, None)
+            if pending_url is not None:
+                browser_logger.info(f"Загрузка отложенной вкладки: {pending_url.toString()}")
+                loader = self._loaders.get(widget)
+                if loader:
+                    loader.load_url(pending_url.toString())
+            else:
+                self._update_toolbar(widget.url())
+        browser_logger.info(f"Браузер отобразил вкладку {index}")
 
     def on_url_changed(self, url, view):
         if self.stack and self.stack.currentWidget() is view:
             self._update_toolbar(url)
         self._inject_scripts_to_view(view)
+        if not self._restoring:
+            self.session.record_visit(url.toString(), view.title() if hasattr(view, 'title') else "")
+            self.save_session()
 
     def close_tab(self, index):
+        browser_logger.info(f"Действие пользователя: закрытие вкладки {index}")
         if index < 0 or not self.stack:
             return
-        self.tab_bar.removeTab(index)
         widget = self.stack.widget(index)
         if widget:
+            if isinstance(widget, QWebEngineView):
+                self._pending_urls.pop(widget, None)
+                url = widget.url().toString()
+                if not self._restoring:
+                    self.session.record_action(f"Закрыта вкладка: {url}")
+            self.tab_bar.removeTab(index)
             self.stack.removeWidget(widget)
             if widget in self._loaders:
                 del self._loaders[widget]
             if widget in self._reload_counts:
                 del self._reload_counts[widget]
             widget.deleteLater()
+            browser_logger.info(f"Браузер закрыл вкладку {index}")
+
         if self.tab_bar.count() == 0:
+            browser_logger.info("Все вкладки закрыты, создаётся новая пустая вкладка")
             self.add_new_page_tab(QUrl("about:blank"))
+        else:
+            if not self._restoring:
+                self.save_session()
 
     def active_loader(self):
         if self.stack and self.stack.currentWidget() in self._loaders:
@@ -170,18 +217,32 @@ class TabsBox(Box):
         return None
 
     def restore_session(self):
-        states = self.session.get_tab_states()
-        if states:
-            for item in states:
-                url = item.get("url") if isinstance(item, dict) else str(item)
-                self.add_new_page_tab(QUrl(url))
+        browser_logger.info("Браузер восстанавливает сессию (ленивая загрузка)")
+        self._restoring = True
+        try:
+            states = self.session.get_tab_states()
+            if states:
+                for i, item in enumerate(states):
+                    url_str = item.get("url") if isinstance(item, dict) else str(item)
+                    qurl = QUrl(url_str)
+                    load_now = (i == 0)
+                    self.add_new_page_tab(qurl, load_immediately=load_now)
+                if self.tab_bar.count() > 0:
+                    self.tab_bar.setCurrentIndex(0)
+        finally:
+            self._restoring = False
 
     def save_session(self):
+        browser_logger.info("Браузер сохраняет сессию (автоматически)")
         urls = []
         for i in range(self.stack.count()):
             w = self.stack.widget(i)
             if isinstance(w, QWebEngineView):
-                urls.append(w.url().toString())
+                url = self._pending_urls.get(w)
+                if url is not None:
+                    urls.append(url.toString())
+                else:
+                    urls.append(w.url().toString())
         self.session.set_tab_states(urls)
         self.session.save_session()
 
@@ -205,10 +266,13 @@ class TabsBox(Box):
         if view in self._reload_counts:
             self._reload_counts[view] += 1
             if self._reload_counts[view] <= reload_limit:
-                if view in self._loaders:
-                    self._loaders[view].reload()
-                return
-        view.setHtml(f"<h1>{self.settings.tr('crash.title')}</h1><p>{self.settings.tr('crash.message')}</p>")
+                browser_logger.info("Попытка перезагрузки после сбоя")
+                view.reload()
+            else:
+                browser_logger.error(self.settings.tr("error.reload_limit_exceeded"))
+        else:
+            self._reload_counts[view] = 1
+            view.reload()
 
     def retranslate_ui(self):
         self.toggle_main_btn.setToolTip(self.settings.tr("tab.toggle_main"))

@@ -1,15 +1,12 @@
 from PyQt6.QtCore import Qt, QPropertyAnimation, QEasingCurve, QParallelAnimationGroup
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout,
-    QPushButton, QLabel, QLineEdit,
-    QListWidget, QListWidgetItem, QFileDialog,
-    QMessageBox, QCheckBox, QFormLayout,
-    QSpinBox, QScrollArea, QSizePolicy,
-    QComboBox, QDoubleSpinBox, QInputDialog
+    QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QLineEdit,
+    QListWidget, QListWidgetItem, QFileDialog, QMessageBox, QCheckBox,
+    QFormLayout, QSpinBox, QScrollArea, QSizePolicy, QComboBox,
+    QDoubleSpinBox, QInputDialog
 )
 from level_0.level_base import Box
 from logger import browser_logger
-
 
 class CollapsibleSection(QWidget):
     def __init__(self, title, parent=None):
@@ -25,17 +22,10 @@ class CollapsibleSection(QWidget):
         self.toggle_btn.clicked.connect(self._toggle)
         self.toggle_btn.setStyleSheet("""
             QPushButton {
-                text-align: left;
-                padding: 8px;
-                border: 1px solid #999;
-                border-radius: 4px;
-                background-color: #f0f0f0;
-                font-weight: bold;
+                text-align: left; padding: 8px; border: 1px solid #999; border-radius: 4px; background-color: #f0f0f0; font-weight: bold;
             }
             QPushButton:checked {
-                background-color: #e0e0e0;
-                border-bottom-left-radius: 0px;
-                border-bottom-right-radius: 0px;
+                background-color: #e0e0e0; border-bottom-left-radius: 0px; border-bottom-right-radius: 0px;
             }
         """)
         layout.addWidget(self.toggle_btn)
@@ -66,7 +56,6 @@ class CollapsibleSection(QWidget):
     def _animate(self, expand):
         if self._animation and self._animation.state() == QParallelAnimationGroup.State.Running:
             self._animation.stop()
-
         if expand:
             self.content_area.setVisible(True)
             self.content_area.adjustSize()
@@ -87,17 +76,17 @@ class CollapsibleSection(QWidget):
             self._animation.finished.connect(lambda: self.content_area.setVisible(False))
         self._animation.start()
 
-
 class SettingsTabBox(Box):
-    def __init__(self, settings, ext_level):
+    def __init__(self, settings, ext_level, session_wrapper):
         super().__init__("settings_tab")
         self.settings = settings
         self.ext_level = ext_level
+        self.session = session_wrapper
         self._widget = None
         self.user_changed_callback = None
         self.settings_saved_callback = None
 
-        # Элементы интерфейса
+        # Существующие поля
         self.homepage_edit = None
         self.restore_session_check = None
         self.profile_path_edit = None
@@ -126,6 +115,21 @@ class SettingsTabBox(Box):
         self.active_user_label = None
         self.language_combo = None
 
+        # Поля для контекстного меню
+        self.ctx_back = None
+        self.ctx_forward = None
+        self.ctx_reload = None
+        self.ctx_save_page = None
+        self.ctx_print = None
+        self.ctx_copy = None
+        self.ctx_paste = None
+        self.ctx_select_all = None
+        self.ctx_open_link_new_tab = None
+        self.ctx_open_link_new_window = None
+        self.ctx_copy_link = None
+        self.ctx_save_image = None
+        self.ctx_copy_image = None
+
     def get_settings(self):
         return self.settings
 
@@ -137,7 +141,6 @@ class SettingsTabBox(Box):
 
     def create_widget(self, parent=None):
         self._widget = QWidget(parent)
-
         main_scroll = QScrollArea()
         main_scroll.setWidgetResizable(True)
         container = QWidget()
@@ -231,6 +234,41 @@ class SettingsTabBox(Box):
         privacy_section.setContentLayout(privacy_form)
         main_layout.addWidget(privacy_section)
 
+        # --- Контекстное меню ---
+        context_menu_section = CollapsibleSection(self.settings.tr("settings.section.context_menu"))
+        context_form = QFormLayout()
+        self.ctx_back = QCheckBox(self.settings.tr("settings.context_menu.back"))
+        self.ctx_forward = QCheckBox(self.settings.tr("settings.context_menu.forward"))
+        self.ctx_reload = QCheckBox(self.settings.tr("settings.context_menu.reload"))
+        self.ctx_save_page = QCheckBox(self.settings.tr("settings.context_menu.save_page"))
+        self.ctx_print = QCheckBox(self.settings.tr("settings.context_menu.print"))
+        self.ctx_copy = QCheckBox(self.settings.tr("settings.context_menu.copy"))
+        self.ctx_paste = QCheckBox(self.settings.tr("settings.context_menu.paste"))
+        self.ctx_select_all = QCheckBox(self.settings.tr("settings.context_menu.select_all"))
+        self.ctx_open_link_new_tab = QCheckBox(self.settings.tr("settings.context_menu.open_link_new_tab"))
+        self.ctx_open_link_new_window = QCheckBox(self.settings.tr("settings.context_menu.open_link_new_window"))
+        self.ctx_copy_link = QCheckBox(self.settings.tr("settings.context_menu.copy_link"))
+        self.ctx_save_image = QCheckBox(self.settings.tr("settings.context_menu.save_image"))
+        self.ctx_copy_image = QCheckBox(self.settings.tr("settings.context_menu.copy_image"))
+
+        # Группируем по смыслу
+        context_form.addRow(self.settings.tr("context_menu.back"), self.ctx_back)
+        context_form.addRow(self.settings.tr("context_menu.forward"), self.ctx_forward)
+        context_form.addRow(self.settings.tr("context_menu.reload"), self.ctx_reload)
+        context_form.addRow(self.settings.tr("context_menu.save_page"), self.ctx_save_page)
+        context_form.addRow(self.settings.tr("context_menu.print"), self.ctx_print)
+        context_form.addRow(self.settings.tr("context_menu.copy"), self.ctx_copy)
+        context_form.addRow(self.settings.tr("context_menu.paste"), self.ctx_paste)
+        context_form.addRow(self.settings.tr("context_menu.select_all"), self.ctx_select_all)
+        context_form.addRow(self.settings.tr("context_menu.open_link_new_tab"), self.ctx_open_link_new_tab)
+        context_form.addRow(self.settings.tr("context_menu.open_link_new_window"), self.ctx_open_link_new_window)
+        context_form.addRow(self.settings.tr("context_menu.copy_link"), self.ctx_copy_link)
+        context_form.addRow(self.settings.tr("context_menu.save_image"), self.ctx_save_image)
+        context_form.addRow(self.settings.tr("context_menu.copy_image"), self.ctx_copy_image)
+
+        context_menu_section.setContentLayout(context_form)
+        main_layout.addWidget(context_menu_section)
+
         # --- Поиск ---
         search_section = CollapsibleSection(self.settings.tr("settings.section.search"))
         search_form = QFormLayout()
@@ -280,9 +318,7 @@ class SettingsTabBox(Box):
         proxy_form = QFormLayout()
         self.proxy_type_combo = QComboBox()
         self.proxy_type_combo.addItems([
-            self.settings.tr("proxy.none"),
-            "HTTP",
-            "SOCKS5"
+            self.settings.tr("proxy.none"), "HTTP", "SOCKS5"
         ])
         proxy_form.addRow(self.settings.tr("settings.proxy_type"), self.proxy_type_combo)
         self.proxy_host_edit = QLineEdit()
@@ -333,11 +369,10 @@ class SettingsTabBox(Box):
         reset_btn.clicked.connect(self.reset_to_defaults)
         button_layout.addWidget(reset_btn)
         main_layout.addLayout(button_layout)
-
         main_layout.addStretch()
+
         self._widget.setLayout(QVBoxLayout())
         self._widget.layout().addWidget(main_scroll)
-
         self.refresh_all()
         return self._widget
 
@@ -392,10 +427,62 @@ class SettingsTabBox(Box):
         self.max_cpu_spin.setValue(self.settings.get("resource_limits.max_cpu_percent", 90))
         self.monitor_interval_spin.setValue(self.settings.get("resource_limits.monitor_interval_ms", 5000))
 
+        # Контекстное меню
+        ctx_defaults = {
+            "back": True, "forward": True, "reload": True, "save_page": True,
+            "print": True, "copy": True, "paste": True, "select_all": True,
+            "open_link_new_tab": True, "open_link_new_window": True,
+            "copy_link": True, "save_image": True, "copy_image": True
+        }
+        ctx = self.settings.get("context_menu", ctx_defaults)
+        self.ctx_back.setChecked(ctx.get("back", True))
+        self.ctx_forward.setChecked(ctx.get("forward", True))
+        self.ctx_reload.setChecked(ctx.get("reload", True))
+        self.ctx_save_page.setChecked(ctx.get("save_page", True))
+        self.ctx_print.setChecked(ctx.get("print", True))
+        self.ctx_copy.setChecked(ctx.get("copy", True))
+        self.ctx_paste.setChecked(ctx.get("paste", True))
+        self.ctx_select_all.setChecked(ctx.get("select_all", True))
+        self.ctx_open_link_new_tab.setChecked(ctx.get("open_link_new_tab", True))
+        self.ctx_open_link_new_window.setChecked(ctx.get("open_link_new_window", True))
+        self.ctx_copy_link.setChecked(ctx.get("copy_link", True))
+        self.ctx_save_image.setChecked(ctx.get("save_image", True))
+        self.ctx_copy_image.setChecked(ctx.get("copy_image", True))
+
     def save_settings(self):
         if not self.settings:
             QMessageBox.warning(self._widget, "Ошибка", self.settings.tr("settings.error.no_settings"))
             return
+
+        old_values = {
+            "locale": self.settings.get_current_lang(),
+            "startup.homepage": self.settings.get("startup.homepage", "about:blank"),
+            "startup.restore_session": self.settings.get("startup.restore_session", True),
+            "profile_path": self.settings.get("profile_path", "browser_data"),
+            "user_agent": self.settings.get("user_agent", ""),
+            "enable_javascript": self.settings.get("enable_javascript", True),
+            "enable_images": self.settings.get("enable_images", True),
+            "privacy.block_popups": self.settings.get("privacy.block_popups", True),
+            "privacy.do_not_track": self.settings.get("privacy.do_not_track", False),
+            "privacy.cookie_policy": self.settings.get("privacy.cookie_policy", 0),
+            "search.url": self.settings.get("search.url", "https://www.google.com/search?q=%s"),
+            "appearance.font_size": self.settings.get("appearance.font_size", 16),
+            "appearance.default_zoom": self.settings.get("appearance.default_zoom", 1.0),
+            "appearance.theme": self.settings.get("appearance.theme", self.settings.tr("theme.system")),
+            "downloads.path": self.settings.get("downloads.path", ""),
+            "downloads.ask_before_save": self.settings.get("downloads.ask_before_save", True),
+            "proxy.type": self.settings.get("proxy.type", self.settings.tr("proxy.none")),
+            "proxy.host": self.settings.get("proxy.host", ""),
+            "proxy.port": self.settings.get("proxy.port", 8080),
+            "tab_limits.max_tabs": self.settings.get("tab_limits.max_tabs", 50),
+            "tab_limits.reload_limit": self.settings.get("tab_limits.reload_limit", 5),
+            "tab_limits.reload_interval_sec": self.settings.get("tab_limits.reload_interval_sec", 30),
+            "resource_limits.max_memory_percent": self.settings.get("resource_limits.max_memory_percent", 80),
+            "resource_limits.max_cpu_percent": self.settings.get("resource_limits.max_cpu_percent", 90),
+            "resource_limits.monitor_interval_ms": self.settings.get("resource_limits.monitor_interval_ms", 5000),
+            "context_menu": self.settings.get("context_menu", {})
+        }
+
         new_lang = self.language_combo.currentText()
         old_lang = self.settings.get_current_lang()
         if new_lang != old_lang:
@@ -425,10 +512,36 @@ class SettingsTabBox(Box):
         self.settings.set("resource_limits.max_memory_percent", self.max_mem_spin.value())
         self.settings.set("resource_limits.max_cpu_percent", self.max_cpu_spin.value())
         self.settings.set("resource_limits.monitor_interval_ms", self.monitor_interval_spin.value())
+
+        ctx = {
+            "back": self.ctx_back.isChecked(),
+            "forward": self.ctx_forward.isChecked(),
+            "reload": self.ctx_reload.isChecked(),
+            "save_page": self.ctx_save_page.isChecked(),
+            "print": self.ctx_print.isChecked(),
+            "copy": self.ctx_copy.isChecked(),
+            "paste": self.ctx_paste.isChecked(),
+            "select_all": self.ctx_select_all.isChecked(),
+            "open_link_new_tab": self.ctx_open_link_new_tab.isChecked(),
+            "open_link_new_window": self.ctx_open_link_new_window.isChecked(),
+            "copy_link": self.ctx_copy_link.isChecked(),
+            "save_image": self.ctx_save_image.isChecked(),
+            "copy_image": self.ctx_copy_image.isChecked()
+        }
+        self.settings.set("context_menu", ctx)
+
+        changes = {}
+        for key, old_val in old_values.items():
+            new_val = self.settings.get(key)
+            if str(old_val) != str(new_val):
+                changes[key] = {"old": str(old_val), "new": str(new_val)}
+
+        if changes:
+            self.session.record_settings_change(changes)
+
         self.settings.save_settings()
         QMessageBox.information(self._widget, "Сохранено", self.settings.tr("settings.saved"))
         browser_logger.info("Настройки сохранены через UI")
-
         if self.settings_saved_callback:
             self.settings_saved_callback()
 
@@ -459,15 +572,20 @@ class SettingsTabBox(Box):
             "resource_limits.max_memory_percent": 80,
             "resource_limits.max_cpu_percent": 90,
             "resource_limits.monitor_interval_ms": 5000,
+            "context_menu": {
+                "back": True, "forward": True, "reload": True, "save_page": True,
+                "print": True, "copy": True, "paste": True, "select_all": True,
+                "open_link_new_tab": True, "open_link_new_window": True,
+                "copy_link": True, "save_image": True, "copy_image": True
+            }
         }
         for k, v in defaults.items():
             self.settings.set(k, v)
         self.settings.save_settings()
         self.refresh_all()
         QMessageBox.information(self._widget, "Сброс", self.settings.tr("settings.reset_done"))
-        browser_logger.info("Настройки сброшены")
+        browser_logger.info("Настройки сброшены к значениям по умолчанию")
 
-    # Управление пользователями
     def get_users(self):
         return self.settings.get("users.list", ["Default"])
 
@@ -539,8 +657,6 @@ class SettingsTabBox(Box):
             self.user_changed_callback(name)
 
     def retranslate_ui(self):
-        # Обновление текстов при смене языка – для простоты не реализовано динамически,
-        # так как требуется пересоздание виджета. При необходимости можно вызвать recreate.
         pass
 
     def refresh_extensions_list(self, ext_list_widget=None):
