@@ -3,6 +3,7 @@ from PyQt6.QtWidgets import (
     QWidget, QHBoxLayout, QTabBar, QStackedWidget, QPushButton
 )
 from PyQt6.QtWebEngineWidgets import QWebEngineView
+from PyQt6.QtWebEngineCore import QWebEngineProfile, QWebEnginePage
 from page_loader import PageLoader
 from level_0.level_base import Box
 from logger import browser_logger
@@ -26,7 +27,13 @@ class TabsBox(Box):
         self._toggle_main_cb = None
         self.toolbar = None
         self._restoring = False
-        self._pending_urls = {}   # QWebEngineView -> QUrl
+        self._pending_urls = {}
+        self.current_profile = None
+
+    def set_profile(self, profile: QWebEngineProfile):
+        """Устанавливает профиль для всех новых вкладок."""
+        self.current_profile = profile
+        browser_logger.info("Профиль для вкладок обновлён")
 
     def set_stack(self, stack: QStackedWidget):
         self.stack = stack
@@ -96,8 +103,12 @@ class TabsBox(Box):
             browser_logger.warning(f"Достигнут лимит вкладок ({max_tabs}), открытие запрещено")
             return
 
+        # Создаём view и назначаем страницу с профилем
         view = QWebEngineView()
-        # Подключаем контекстное меню
+        if self.current_profile:
+            page = QWebEnginePage(self.current_profile, view)
+            view.setPage(page)
+
         self.context_menu.call("setup_view", view)
 
         loader = PageLoader(view)

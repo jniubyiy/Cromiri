@@ -40,7 +40,8 @@ class UILevelCore(LevelCore):
         tabs_wrapper.expose_methods(
             "set_stack", "set_toggle_main_callback", "create_widget", "add_new_page_tab",
             "active_loader", "restore_session", "save_session", "on_tab_changed",
-            "on_url_changed", "close_tab", "set_toolbar", "retranslate_ui", "apply_settings"
+            "on_url_changed", "close_tab", "set_toolbar", "retranslate_ui", "apply_settings",
+            "set_profile"   # <-- добавлено
         )
 
         # 4. ToolbarBox
@@ -51,7 +52,7 @@ class UILevelCore(LevelCore):
             "update_address_bar", "retranslate_ui"
         )
 
-        # 5. MainTabsBox (теперь 5 вкладок)
+        # 5. MainTabsBox (5 вкладок)
         main_tabs_box = MainTabsBox(self._settings)
         main_tabs_wrapper = self.register_box(main_tabs_box)
         main_tabs_wrapper.expose_methods(
@@ -120,7 +121,7 @@ class UILevelWrapper(LevelWrapper):
             "get_settings", "refresh_scripts_list", "build", "set_toolbar", "set_user_changed_callback",
             "retranslate_ui", "apply_settings", "set_settings_saved_callback", "reload_settings",
             "refresh", "record_visit", "record_action", "record_download", "record_settings_change",
-            "set_open_url_callback", "setup_view", "set_new_tab_callback"
+            "set_open_url_callback", "setup_view", "set_new_tab_callback", "set_profile"
         ])
 
     def initialize(self):

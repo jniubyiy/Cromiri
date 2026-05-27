@@ -36,12 +36,12 @@ class BrowserMainWindow(QMainWindow):
         self.context_menu = box_wrappers.get("context_menu")
         self.extensions = box_wrappers.get("extensions")
 
-        self.profile = QWebEngineProfile.defaultProfile()
-        self.update_profile_path()
-        self.apply_download_settings()
+        # Создаём постоянный профиль для текущего пользователя
+        self._setup_profile()
         self.profile.downloadRequested.connect(self.handle_download_request)
         if self.extensions:
             self.extensions.set_profile(self.profile)
+        self.tabs.call("set_profile", self.profile)   # передаём профиль для будущих вкладок
 
         self.page_stack = QStackedWidget()
         self.tabs.call("set_stack", self.page_stack)
@@ -99,16 +99,21 @@ class BrowserMainWindow(QMainWindow):
         self.installEventFilter(self)
         self.main_tabs_visible = True
 
-    def open_url_from_bookmark(self, url: str):
-        """Открывает URL в новой вкладке."""
-        self.tabs.call("add_new_page_tab", QUrl(url))
-
-    def update_profile_path(self):
-        base_path = self.settings.get("profile_path", "browser_data")
+    def _setup_profile(self):
+        """
+        Создаёт постоянный профиль QWebEngineProfile для текущего пользователя.
+        Имя профиля делает его persistent, а setPersistentStoragePath определяет папку хранения.
+        """
         user = self.settings.get("users.active", "Default")
+        base_path = self.settings.get("profile_path", "browser_data")
         user_path = f"{base_path}/{user}" if base_path else f"browser_data/{user}"
+
+        # Уникальное имя профиля — гарантия persistent-режима
+        self.profile = QWebEngineProfile(f"user_{user}")
         self.profile.setPersistentStoragePath(user_path)
         self.profile.setHttpCacheType(QWebEngineProfile.HttpCacheType.DiskHttpCache)
+        self.apply_download_settings()
+        browser_logger.info(f"Постоянный профиль создан для пользователя '{user}', путь: {user_path}")
 
     def apply_download_settings(self):
         download_path = self.settings.get("downloads.path", "")
@@ -123,18 +128,27 @@ class BrowserMainWindow(QMainWindow):
             self.session.record_download(download.downloadFileName())
             browser_logger.info(f"Загрузка начата: {download.downloadFileName()}")
 
+    def open_url_from_bookmark(self, url: str):
+        self.tabs.call("add_new_page_tab", QUrl(url))
+
     def on_user_changed(self, username):
+        """Переключение на другого встроенного пользователя."""
         browser_logger.info(f"Переключение на пользователя {username}")
         self.tabs.call("save_session")
-        self.update_profile_path()
+
         while self.page_stack.count() > 0:
             widget = self.page_stack.widget(0)
             self.page_stack.removeWidget(widget)
             widget.deleteLater()
+
+        self._setup_profile()
+        self.tabs.call("set_profile", self.profile)
+
         self.tabs.call("restore_session")
         if self.page_stack.count() == 0:
             homepage = self.settings.get("startup.homepage", "about:blank")
             self.tabs.call("add_new_page_tab", QUrl(homepage))
+
         self.history_tab.call("refresh")
         self.bookmarks_tab.call("refresh")
         browser_logger.info(f"Браузер переключился на профиль '{username}'")
