@@ -1,2 +1,0 @@
-Уровень 7: Пользовательский интерфейс.
-Боксы: main_tabs, toolbar, tabs, settings_tab, scripts_tab, style_script, window.

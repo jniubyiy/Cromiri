@@ -1,44 +1,38 @@
+# level_0/level_base.py
+
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional
 from logger import browser_logger
 
-# Порядок уровней для определения приоритета (чем меньше номер, тем выше приоритет)
 LEVEL_ORDER = {
-    "DeviceLevel": 1,
-    "ResourceLevel": 2,
-    "ManagerLevel": 3,
-    "FileLevel": 4,
-    "SettingsLevel": 5,
-    "SessionLevel": 6,
-    "ExtensionsLevel": 7,
-    "UILevel": 8,
+    "LoggerLevel": 1,
+    "DeviceLevel": 2,
+    "ResourceLevel": 3,
+    "InputLevel": 4,
+    "ManagerLevel": 5,
+    "FileLevel": 6,
+    "SettingsLevel": 7,
+    "UserLevel": 8,
+    "SessionLevel": 9,
+    "ExtensionsLevel": 10,
+    "ScriptLevel": 11,
+    "UILevel": 12,
+    "NetworkLevel": 13,
+    "DownloadLevel": 14,
 }
 
-# -------------------------------------------------------------------
-# 1. Базовый класс бокса
-# -------------------------------------------------------------------
 class Box:
-    """Базовый класс для всех боксов."""
     def __init__(self, box_name: str):
         self.box_name = box_name
-        self.level_number = 99   # будет переопределён при регистрации
+        self.level_number = 99
 
-# -------------------------------------------------------------------
-# 2. Обёртка бокса
-# -------------------------------------------------------------------
 class BoxWrapper:
-    """
-    Обёртка бокса.
-    - Контролирует доступ к методам бокса.
-    - Логирует вызовы.
-    """
     def __init__(self, box: Box, level_name: str):
         self._box = box
         self._level_name = level_name
         self._allowed_methods: set[str] = set()
 
     def expose_methods(self, *methods: str):
-        """Регистрирует публичные методы бокса."""
         self._allowed_methods.update(methods)
 
     def call(self, method: str, *args, **kwargs) -> Any:
@@ -61,21 +55,12 @@ class BoxWrapper:
         )
         return result
 
-# -------------------------------------------------------------------
-# 3. Ядро уровня
-# -------------------------------------------------------------------
 class LevelCore(ABC):
-    """
-    Ядро уровня.
-    - Хранит обёрнутые боксы.
-    - Перенаправляет запросы к боксам.
-    """
     def __init__(self, level_name: str):
         self.level_name = level_name
         self._box_wrappers: Dict[str, BoxWrapper] = {}
 
     def register_box(self, box: Box) -> BoxWrapper:
-        # Устанавливаем номер уровня для приоритета
         box.level_number = LEVEL_ORDER.get(self.level_name, 99)
         wrapper = BoxWrapper(box, self.level_name)
         self._box_wrappers[box.box_name] = wrapper
@@ -93,18 +78,12 @@ class LevelCore(ABC):
 
     @abstractmethod
     def setup_boxes(self):
-        """Создание и регистрация боксов."""
         pass
 
     def reload_box(self, box_name: str):
-        """Перезагружает указанный бокс (по умолчанию не поддерживается)."""
         raise NotImplementedError("Этот уровень не поддерживает перезагрузку боксов")
 
-# -------------------------------------------------------------------
-# 4. Запрос между уровнями
-# -------------------------------------------------------------------
 class LevelRequest:
-    """Структура запроса, путешествующего по цепочке уровней."""
     def __init__(self, target_level: str, box_name: str, method: str, args: tuple, kwargs: dict, source_level: str):
         self.target_level = target_level
         self.box_name = box_name
@@ -113,21 +92,12 @@ class LevelRequest:
         self.kwargs = kwargs
         self.source_level = source_level
 
-# -------------------------------------------------------------------
-# 5. Обёртка уровня
-# -------------------------------------------------------------------
 class LevelWrapper(ABC):
-    """
-    Обёртка уровня.
-    - Принимает запросы от соседей.
-    - Проверяет права доступа.
-    - Либо исполняет запрос (если цель — этот уровень), либо передаёт дальше.
-    """
     def __init__(self, core: LevelCore):
         self._core = core
-        self._upper: Optional[LevelWrapper] = None   # сосед сверху (больший номер)
-        self._lower: Optional[LevelWrapper] = None   # сосед снизу (меньший номер)
-        self._allowed_incoming: Dict[str, List[str]] = {}  # {source_level: [methods]}
+        self._upper: Optional[LevelWrapper] = None
+        self._lower: Optional[LevelWrapper] = None
+        self._allowed_incoming: Dict[str, List[str]] = {}
         self._public_api: set[str] = set()
 
     def set_neighbors(self, lower: Optional['LevelWrapper'] = None, upper: Optional['LevelWrapper'] = None):
@@ -138,7 +108,6 @@ class LevelWrapper(ABC):
         self._public_api.update(methods)
 
     def allow_request_from(self, source_level: str, methods: List[str]):
-        """Разрешает входящие запросы от указанного уровня."""
         self._allowed_incoming[source_level] = methods
 
     def handle_request(self, request: LevelRequest) -> Any:

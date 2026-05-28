@@ -1,0 +1,4 @@
+Уровень работы с файлами (FileLevel).
+Проверяет наличие необходимых директорий и создаёт их при старте.
+Боксы:
+- checker (FileCheckerBox): обеспечение существования папок browser_data, settings, session, extensions, logs, builtin_extensions.
