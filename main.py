@@ -2,15 +2,12 @@ import sys
 import os
 import re
 import json
+import importlib
 from PyQt6.QtWidgets import QApplication
 from level_0 import LevelZero
 from logger import browser_logger
 
 def scan_levels(base_dir):
-    """
-    Сканирует папки уровней (level_N_...) в base_dir и возвращает список словарей
-    с информацией об уровне: имя, модуль, класс обёртки, номер, зависимости (пока пустые).
-    """
     levels = []
     pattern = re.compile(r'^level_(\d+)_(.+)$')
     for entry in os.listdir(base_dir):
@@ -18,22 +15,34 @@ def scan_levels(base_dir):
         if not match:
             continue
         num = int(match.group(1))
+        if num == 0:
+            continue
         name_suffix = match.group(2)
-        class_name = ''.join(part.capitalize() for part in name_suffix.split('_')) + 'LevelWrapper'
         module_name = entry
-        level_name = class_name.replace('LevelWrapper', 'Level')
+        wrapper_class = None
+        deps = []
+        try:
+            mod = importlib.import_module(module_name)
+            if hasattr(mod, 'WRAPPER_CLASS'):
+                wrapper_class = mod.WRAPPER_CLASS
+            if hasattr(mod, 'DEPS'):
+                deps = mod.DEPS
+        except Exception:
+            pass
+        if not wrapper_class:
+            wrapper_class = ''.join(part.capitalize() for part in name_suffix.split('_')) + 'LevelWrapper'
+        level_name = wrapper_class.replace('LevelWrapper', 'Level')
         levels.append({
             'num': num,
             'name': level_name,
             'module': module_name,
-            'class': class_name,
-            'deps': []  # зависимости можно будет задать в description.txt
+            'class': wrapper_class,
+            'deps': deps
         })
     levels.sort(key=lambda x: x['num'])
     return levels
 
 def scan_boxes(level_path):
-    """Сканирует подпапки box_* внутри папки уровня и возвращает список имён боксов."""
     boxes = []
     if not os.path.isdir(level_path):
         return boxes
@@ -43,7 +52,6 @@ def scan_boxes(level_path):
     return boxes
 
 def generate_registry(base_dir, output_path):
-    """Создаёт файл level_registry.py, содержащий списки уровней и их боксов."""
     levels = scan_levels(base_dir)
     registry = []
     for lvl in levels:
@@ -56,7 +64,6 @@ def generate_registry(base_dir, output_path):
             'deps': lvl['deps'],
             'boxes': boxes
         })
-
     with open(output_path, 'w', encoding='utf-8') as f:
         f.write("# Автоматически сгенерированный реестр уровней и боксов\n")
         f.write("# Не редактируйте вручную\n\n")
@@ -70,19 +77,25 @@ if __name__ == "__main__":
     base_dir = os.path.dirname(os.path.abspath(__file__))
     registry_path = os.path.join(base_dir, "level_0", "level_registry.py")
 
-    # Генерируем реестр, если его нет или если запущен с флагом --generate-registry
     if not os.path.exists(registry_path) or "--generate-registry" in sys.argv:
         generate_registry(base_dir, registry_path)
 
-    # 1. Загружаем все уровни (включая импорт QtWebEngineWidgets)
     level_zero = LevelZero()
     level_zero.bootstrap()
 
-    # 2. Создаём QApplication после импорта WebEngine
     app = QApplication(sys.argv)
 
-    # 3. Получаем главное окно от UI-уровня через прямой вызов публичного метода
-    ui_wrapper = level_zero.levels[-1]  # UILevelWrapper
+    # Получаем UILevel по имени, а не по индексу
+    ui_wrapper = None
+    for level in level_zero.levels:
+        if level._core.level_name == "UILevel":
+            ui_wrapper = level
+            break
+
+    if not ui_wrapper:
+        browser_logger.error("Не удалось найти UILevel среди загруженных уровней")
+        sys.exit(1)
+
     main_window = ui_wrapper.get_main_window()
     main_window.show()
     browser_logger.info("Главное окно отображено, браузер готов")

@@ -35,11 +35,11 @@ class BrowserLogger:
         file_handler = RotatingFileHandler(
             self.log_file, maxBytes=5*1024*1024, backupCount=3, encoding='utf-8'
         )
-        file_handler.setLevel(level)  # DEBUG — будут записаны все вызовы боксов
+        file_handler.setLevel(level)
         file_handler.setFormatter(formatter)
         self.logger.addHandler(file_handler)
 
-        # Консольный обработчик полностью убран
+        # Консольный обработчик убран, чтобы не дублировать логи в консоли
 
         self.logger.info("=" * 50)
         self.logger.info("Запуск браузера")

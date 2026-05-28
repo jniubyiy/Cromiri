@@ -1,0 +1,4 @@
+Уровень пользовательских скриптов (ScriptLevel).
+Загружает, хранит и внедряет JavaScript-скрипты на веб-страницы по шаблонам URL (glob/regex).
+Боксы:
+- script (ScriptBox): CRUD-операции со скриптами, инжекция в QWebEngineView.
